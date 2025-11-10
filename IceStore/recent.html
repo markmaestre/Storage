@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recent | IceStore</title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Arial', sans-serif;
+      overflow: hidden;
+      position: relative;
+      height: 100vh;
+      background: #1a1a2e;
+      color: white;
+    }
+
+    #bg-video {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      min-width: 100%;
+      min-height: 100%;
+      width: auto;
+      height: auto;
+      transform: translate(-50%, -50%);
+      z-index: -1;
+      object-fit: cover;
+    }
+
+    /* Sidebar Styles */
+    .sidebar {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 250px;
+      height: 100vh;
+      background: rgba(26, 26, 46, 0.9);
+      backdrop-filter: blur(10px);
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 20px 0;
+      z-index: 100;
+    }
+
+    .sidebar-header {
+      padding: 0 20px 20px 20px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      margin-bottom: 20px;
+    }
+
+    .sidebar-header h2 {
+      color: #fff;
+      font-weight: bold;
+      font-size: 1.5em;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .sidebar-header .material-icons {
+      color: #00BFFF;
+      font-size: 1.2em;
+    }
+
+    .nav-link {
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .nav-item {
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #ccc;
+      transition: all 0.3s ease;
+      border-left: 3px solid transparent;
+    }
+
+    .nav-item:hover {
+      background: rgba(0, 191, 255, 0.1);
+      color: white;
+    }
+
+    .nav-item.active {
+      background: rgba(0, 191, 255, 0.2);
+      color: #00BFFF;
+      border-left-color: #00BFFF;
+    }
+
+    .nav-item .material-icons {
+      font-size: 1.2em;
+    }
+
+    .sidebar-usage-info {
+      padding: 15px 20px;
+      margin-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .sidebar-progress-bar {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+      margin-bottom: 8px;
+      overflow: hidden;
+    }
+
+    .sidebar-progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #00BFFF, #4DEEE8);
+      border-radius: 3px;
+      transition: width 0.5s ease;
+    }
+
+    .storage-btn {
+      width: 100%;
+      padding: 10px;
+      background: rgba(0, 191, 255, 0.2);
+      color: white;
+      border: 1px solid rgba(0, 191, 255, 0.5);
+      border-radius: 6px;
+      cursor: pointer;
+      margin-top: 10px;
+      transition: all 0.3s ease;
+    }
+
+    .storage-btn:hover {
+      background: rgba(0, 191, 255, 0.3);
+      transform: translateY(-1px);
+    }
+
+    /* Main Content Styles */
+    .main-content {
+      margin-left: 250px;
+      height: 100vh;
+      overflow-y: auto;
+      position: relative;
+      background: rgba(26, 26, 46, 0.7);
+      backdrop-filter: blur(5px);
+    }
+
+    /* User Info Styles */
+    .user-info {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 12px 18px;
+      border-radius: 10px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      z-index: 100;
+    }
+
+    .user-details {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #00BFFF, #4DEEE8);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: bold;
+      font-size: 1.1em;
+    }
+
+    .user-text {
+      color: white;
+    }
+
+    .user-name {
+      font-weight: bold;
+      margin: 0;
+      font-size: 0.95em;
+    }
+
+    .user-email {
+      font-size: 0.8em;
+      margin: 0;
+      opacity: 0.8;
+    }
+
+    .logout-btn {
+      background: rgba(255, 71, 87, 0.3);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      padding: 6px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      margin-top: 8px;
+      font-size: 0.8em;
+      transition: all 0.3s ease;
+      width: 100%;
+    }
+
+    .logout-btn:hover {
+      background: rgba(255, 71, 87, 0.5);
+      transform: translateY(-1px);
+    }
+
+    /* Header Styles */
+    .header {
+      padding: 80px 40px 30px 40px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .header h1 {
+      font-size: 2.5em;
+      font-weight: 300;
+      color: white;
+      margin: 0;
+    }
+
+    .header p {
+      color: #ccc;
+      margin-top: 10px;
+      font-size: 1.1em;
+    }
+
+    /* File Container Styles */
+    .file-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 20px;
+      padding: 30px 40px;
+      max-height: calc(100vh - 200px);
+      overflow-y: auto;
+    }
+
+    .file-item {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .file-item:hover {
+      transform: translateY(-5px);
+      background: rgba(255, 255, 255, 0.15);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+      border-color: rgba(0, 191, 255, 0.5);
+    }
+
+    .file-icon {
+      font-size: 48px;
+      color: #00BFFF;
+      margin-bottom: 12px;
+    }
+
+    .file-name {
+      color: white;
+      font-weight: 500;
+      word-break: break-word;
+      margin-bottom: 8px;
+      font-size: 0.95em;
+    }
+
+    .file-details {
+      color: #ccc;
+      font-size: 0.8em;
+      margin-bottom: 12px;
+    }
+
+    .file-actions {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .file-action-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      color: #ccc;
+      cursor: pointer;
+      padding: 6px;
+      border-radius: 5px;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .file-action-btn:hover {
+      color: #00BFFF;
+      background: rgba(255, 255, 255, 0.2);
+      transform: scale(1.1);
+    }
+
+    /* Empty State Styles */
+    .empty-state-content {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      height: 60vh;
+      width: 100%;
+      text-align: center;
+    }
+
+    .empty-state-content .material-icons {
+      font-size: 100px;
+      color: rgba(255, 255, 255, 0.3);
+      margin-bottom: 20px;
+    }
+
+    .empty-state-content p:first-of-type {
+      font-size: 2em;
+      color: white;
+      font-weight: 300;
+      margin: 0 0 10px 0;
+    }
+
+    .empty-state-content p:last-of-type {
+      font-size: 1.1em;
+      color: #ccc;
+      margin: 0;
+    }
+
+    /* Recent Activity Styles */
+    .activity-list {
+      padding: 0 40px 30px 40px;
+    }
+
+    .activity-item {
+      display: flex;
+      align-items: center;
+      padding: 15px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      gap: 15px;
+    }
+
+    .activity-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 8px;
+      background: rgba(0, 191, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #00BFFF;
+    }
+
+    .activity-details {
+      flex: 1;
+    }
+
+    .activity-title {
+      color: white;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .activity-description {
+      color: #ccc;
+      font-size: 0.9em;
+    }
+
+    .activity-time {
+      color: #888;
+      font-size: 0.8em;
+      white-space: nowrap;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .sidebar {
+        width: 200px;
+      }
+      
+      .main-content {
+        margin-left: 200px;
+      }
+      
+      .file-container {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        padding: 20px;
+      }
+      
+      .header {
+        padding: 80px 20px 20px 20px;
+      }
+      
+      .header h1 {
+        font-size: 2em;
+      }
+      
+      .activity-list {
+        padding: 0 20px 20px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Background Video -->
+  <video autoplay muted loop id="bg-video">
+    <source src="figures/IceBack.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2><span class="material-icons">ac_unit</span> IceStore</h2>
+    </div>
+    
+    <a href="dashboard.html" class="nav-link">
+      <div class="nav-item">
+        <span class="material-icons">folder</span> My Files
+      </div>
+    </a>
+    <a href="recent.html" class="nav-link">
+      <div class="nav-item active">
+        <span class="material-icons">schedule</span> Recent
+      </div>
+    </a>
+    <a href="shared.html" class="nav-link">
+      <div class="nav-item">
+        <span class="material-icons">group</span> Shared with me
+      </div>
+    </a>
+    <a href="trashbin.html" class="nav-link">
+      <div class="nav-item">
+        <span class="material-icons">delete</span> Trash
+      </div>
+    </a>
+    
+    <a href="storage.html" class="nav-link">
+      <div class="nav-item">
+        <span class="material-icons">storage</span> Storage
+      </div>
+    </a>
+    
+    <div class="sidebar-usage-info">
+      <div class="sidebar-progress-bar">
+        <div class="sidebar-progress-fill" id="storage-progress"></div>
+      </div>
+      <p style="margin: 0; color: #ccc; font-size: 0.9em;" id="storage-text">0.00 GB of 15 GB used</p>
+      <button class="storage-btn">Get more storage</button>
+    </div>
+  </div>
+  
+  <!-- Main Content -->
+  <div class="main-content">
+    <!-- User Info Section -->
+    <div class="user-info" id="user-info">
+      <div class="user-details">
+        <div class="user-avatar" id="user-avatar">U</div>
+        <div class="user-text">
+          <p class="user-name" id="user-name">User</p>
+          <p class="user-email" id="user-email">user@example.com</p>
+        </div>
+      </div>
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+
+    <!-- Header -->
+    <div class="header">
+      <h1>Recent Activity</h1>
+      <p>Your recently accessed and modified files</p>
+    </div>
+    
+    <!-- Recent Activity List -->
+    <div class="activity-list" id="activity-list">
+      <!-- Activity items will be populated by JavaScript -->
+    </div>
+
+    <!-- Empty State -->
+    <div class="empty-state-content" id="empty-state">
+      <span class="material-icons">schedule</span>
+      <p>No Recent Activity</p>
+      <p>Your recent file activities will appear here</p>
+    </div>
+  </div>
+
+  <!-- Activity Template -->
+  <template id="activity-template">
+    <div class="activity-item">
+      <div class="activity-icon">
+        <span class="material-icons">description</span>
+      </div>
+      <div class="activity-details">
+        <div class="activity-title">File Name</div>
+        <div class="activity-description">Activity description</div>
+      </div>
+      <div class="activity-time">2 hours ago</div>
+    </div>
+  </template>
+
+  <script>
+    const API_BASE_URL = 'http://localhost:3000/api/auth';
+    let recentActivities = [];
+
+    // Initialize recent page
+    async function initRecent() {
+      console.log('Initializing recent page...');
+      
+      // Check if user is logged in
+      const token = localStorage.getItem('token');
+      const userData = localStorage.getItem('user');
+      
+      if (!token || !userData) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      try {
+        const user = JSON.parse(userData);
+        updateUserDisplay(user);
+        await loadRecentActivities(user);
+        updateStorageUsage();
+        
+        console.log('Recent page initialized with', recentActivities.length, 'activities');
+      } catch (error) {
+        console.error('Error initializing recent page:', error);
+        window.location.href = 'login.html';
+      }
+    }
+
+    function updateUserDisplay(user) {
+      const userInfoElement = document.getElementById('user-info');
+      const userNameElement = document.getElementById('user-name');
+      const userEmailElement = document.getElementById('user-email');
+      const userAvatarElement = document.getElementById('user-avatar');
+      
+      if (userInfoElement) userInfoElement.style.display = 'block';
+      if (userNameElement) userNameElement.textContent = user.username || 'User';
+      if (userEmailElement) userEmailElement.textContent = user.email;
+      if (userAvatarElement) userAvatarElement.textContent = (user.username || 'U').charAt(0).toUpperCase();
+    }
+
+    async function loadRecentActivities(user) {
+      console.log('Loading recent activities for user:', user.id);
+      
+      try {
+        // Load from localStorage for demo purposes
+        const userFileKey = `icestore_files_${user.id}`;
+        const savedFiles = localStorage.getItem(userFileKey);
+        
+        if (savedFiles) {
+          const files = JSON.parse(savedFiles);
+          // Generate recent activities from files
+          recentActivities = generateRecentActivities(files);
+        } else {
+          recentActivities = [];
+        }
+        
+        displayRecentActivities();
+      } catch (error) {
+        console.error('Error loading recent activities:', error);
+        recentActivities = [];
+        displayRecentActivities();
+      }
+    }
+
+    function generateRecentActivities(files) {
+      const activities = [];
+      const activityTypes = ['uploaded', 'modified', 'viewed', 'shared'];
+      
+      files.forEach(file => {
+        // Create multiple activities for each file to simulate recent activity
+        activities.push({
+          id: 'activity_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+          fileId: file.id,
+          fileName: file.name,
+          type: 'uploaded',
+          description: `You uploaded ${file.name}`,
+          timestamp: new Date(file.uploadDate).getTime(),
+          icon: 'file_upload'
+        });
+
+        // Add some random recent activities
+        if (Math.random() > 0.5) {
+          activities.push({
+            id: 'activity_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+            fileId: file.id,
+            fileName: file.name,
+            type: 'viewed',
+            description: `You viewed ${file.name}`,
+            timestamp: new Date(Date.now() - Math.random() * 86400000).getTime(), // Random time in last 24 hours
+            icon: 'visibility'
+          });
+        }
+      });
+
+      // Sort by timestamp (newest first)
+      return activities.sort((a, b) => b.timestamp - a.timestamp);
+    }
+
+    function displayRecentActivities() {
+      const container = document.getElementById('activity-list');
+      const emptyState = document.getElementById('empty-state');
+      const template = document.getElementById('activity-template');
+
+      if (!container) {
+        console.error('Activity container not found!');
+        return;
+      }
+
+      container.innerHTML = '';
+
+      console.log('Displaying activities:', recentActivities.length);
+
+      if (recentActivities.length === 0) {
+        if (container) container.style.display = 'none';
+        if (emptyState) emptyState.style.display = 'flex';
+        return;
+      }
+
+      if (container) container.style.display = 'block';
+      if (emptyState) emptyState.style.display = 'none';
+
+      recentActivities.forEach(activity => {
+        const clone = template.content.cloneNode(true);
+        const activityItem = clone.querySelector('.activity-item');
+        const icon = clone.querySelector('.activity-icon .material-icons');
+        const title = clone.querySelector('.activity-title');
+        const description = clone.querySelector('.activity-description');
+        const time = clone.querySelector('.activity-time');
+
+        // Set activity icon
+        if (icon) icon.textContent = getActivityIcon(activity.type);
+        
+        if (title) title.textContent = activity.fileName;
+        if (description) description.textContent = activity.description;
+        if (time) time.textContent = formatTimeAgo(activity.timestamp);
+        
+        if (activityItem) {
+          activityItem.setAttribute('data-activity-id', activity.id);
+          activityItem.setAttribute('data-file-id', activity.fileId);
+          
+          // Add click event
+          activityItem.addEventListener('click', function() {
+            openFileFromActivity(this);
+          });
+        }
+
+        container.appendChild(clone);
+      });
+    }
+
+    function getActivityIcon(activityType) {
+      const iconMap = {
+        'uploaded': 'file_upload',
+        'modified': 'edit',
+        'viewed': 'visibility',
+        'shared': 'share',
+        'downloaded': 'download'
+      };
+      
+      return iconMap[activityType] || 'description';
+    }
+
+    function formatTimeAgo(timestamp) {
+      const now = new Date().getTime();
+      const diff = now - timestamp;
+      
+      const minutes = Math.floor(diff / 60000);
+      const hours = Math.floor(diff / 3600000);
+      const days = Math.floor(diff / 86400000);
+      
+      if (minutes < 1) return 'Just now';
+      if (minutes < 60) return `${minutes} min ago`;
+      if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+      if (days < 7) return `${days} day${days > 1 ? 's' : ''} ago`;
+      
+      return new Date(timestamp).toLocaleDateString();
+    }
+
+    function openFileFromActivity(element) {
+      const fileId = element.getAttribute('data-file-id');
+      const activity = recentActivities.find(a => a.fileId === fileId);
+      
+      if (activity) {
+        alert(`Opening: ${activity.fileName}\n\nActivity: ${activity.description}\nTime: ${formatTimeAgo(activity.timestamp)}`);
+      }
+    }
+
+    function updateStorageUsage() {
+      const userData = localStorage.getItem('user');
+      if (!userData) return;
+      
+      const user = JSON.parse(userData);
+      const userFileKey = `icestore_files_${user.id}`;
+      const savedFiles = localStorage.getItem(userFileKey);
+      
+      if (savedFiles) {
+        const files = JSON.parse(savedFiles);
+        const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+        const totalSizeGB = totalSize / (1024 * 1024 * 1024);
+        const maxStorageGB = 15;
+        
+        const usagePercentage = Math.min((totalSizeGB / maxStorageGB) * 100, 100);
+        
+        const progressFill = document.getElementById('storage-progress');
+        const usageText = document.getElementById('storage-text');
+        
+        if (progressFill) {
+          progressFill.style.width = `${usagePercentage}%`;
+        }
+        
+        if (usageText) {
+          usageText.textContent = `${totalSizeGB.toFixed(2)} GB of ${maxStorageGB} GB used`;
+        }
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = 'login.html';
+    }
+
+    // Initialize when page loads
+    document.addEventListener('DOMContentLoaded', initRecent);
+  </script>
+</body>
+</html>

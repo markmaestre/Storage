@@ -1,0 +1,288 @@
+/* IceStore Unified Auth Style
+   Used by both login.html and signup.html
+*/
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: "Poppins", sans-serif;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  font-family: 'Poppins', sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #333;
+  overflow: hidden; /* Prevent scrollbars with video */
+}
+
+/* === BACKGROUND VIDEO === */
+#bg-video {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover; /* Ensures full coverage */
+  z-index: -2; /* Keeps it behind everything */
+  background: black;
+}
+
+/* Optional dark overlay for better text contrast */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.45); /* semi-transparent overlay */
+  z-index: -1;
+}
+
+/* === CONTAINER === */
+.auth-container {
+  display: flex;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 20px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  width: 850px;
+  max-width: 95%;
+  position: relative;
+  z-index: 2; /* ensure tile sits above video */
+  animation: slideIn 0.6s ease-out forwards;
+  opacity: 0;
+}
+
+/* === SLIDE-IN ANIMATION === */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* === LEFT PANEL === */
+.auth-info {
+  flex: 1;
+  background: linear-gradient(135deg, #00b4d8, #0077b6);
+  color: #fff;
+  padding: 3rem 2rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.auth-info .logo {
+  width: 90px;
+  margin-bottom: 1.5rem;
+}
+
+.auth-info h1 {
+  font-size: 1.8rem;
+  margin-bottom: 1rem;
+}
+
+.auth-info h1 span {
+  color: #caf0f8;
+}
+
+.auth-info p {
+  font-size: 1rem;
+  line-height: 1.5;
+  max-width: 320px;
+}
+
+/* === RIGHT PANEL === */
+.auth-form {
+  flex: 1;
+  padding: 3rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.95); /* maintains glass-like tile over video */
+  backdrop-filter: blur(10px);
+  border-radius: 0 20px 20px 0;
+}
+
+.auth-form h2 {
+  text-align: center;
+  color: #0077b6;
+  margin-bottom: 1.5rem;
+}
+
+.input-group {
+  margin-bottom: 1.2rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.input-group label {
+  font-size: 0.9rem;
+  margin-bottom: 0.4rem;
+  color: #444;
+}
+
+.input-group input {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  outline: none;
+  transition: 0.3s;
+  font-size: 1rem;
+}
+
+.input-group input:focus {
+  border-color: #00b4d8;
+  box-shadow: 0 0 5px rgba(0, 180, 216, 0.3);
+}
+
+/* === BUTTONS === */
+.submit-btn {
+  background: #0077b6;
+  color: white;
+  border: none;
+  padding: 12px;
+  width: 100%;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.submit-btn:hover {
+  background: #0096c7;
+}
+
+/* === SOCIAL LOGIN === */
+.divider {
+  text-align: center;
+  margin: 1.5rem 0;
+  position: relative;
+}
+
+.divider span {
+  background: #fff;
+  padding: 0 10px;
+  color: #999;
+  font-size: 0.9rem;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  position: absolute;
+  width: 40%;
+  height: 1px;
+  background: #ccc;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.divider::before {
+  left: 0;
+}
+
+.divider::after {
+  right: 0;
+}
+
+.google-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid #ccc;
+  background: #fff;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: 0.3s;
+}
+
+.google-btn:hover {
+  background: #f1faff;
+}
+
+.google-btn img {
+  width: 20px;
+  height: 20px;
+}
+
+/* === MESSAGE & LINKS === */
+.message {
+  text-align: center;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}
+
+.message.success {
+  color: #2a9d8f;
+}
+
+.message.error {
+  color: #e63946;
+}
+
+.auth-links {
+  margin-top: 1.5rem;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.auth-links a {
+  color: #0077b6;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.auth-links a:hover {
+  text-decoration: underline;
+}
+
+/* === RESPONSIVE === */
+@media (max-width: 768px) {
+  .auth-container {
+    flex-direction: column;
+    width: 95%;
+  }
+
+  .auth-info {
+    padding: 2rem 1rem;
+  }
+
+  .auth-form {
+    padding: 2rem 1rem;
+  }
+}
+
+/* === PAGE TRANSITION === */
+body {
+  opacity: 0;
+  transform: translateX(40px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+body.page-loaded {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+body.page-exit {
+  opacity: 0;
+  transform: translateX(-40px);
+}

@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign Up | IceStore</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Arial', sans-serif;
+      overflow: hidden;
+      position: relative;
+      height: 100vh;
+    }
+
+    #bg-video {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      min-width: 100%;
+      min-height: 100%;
+      width: auto;
+      height: auto;
+      transform: translate(-50%, -50%);
+      z-index: -1;
+      object-fit: cover;
+    }
+
+    .auth-container {
+      display: flex;
+      min-height: 100vh;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      position: relative;
+    }
+
+    .auth-info {
+      flex: 1;
+      max-width: 500px;
+      padding: 40px;
+      color: white;
+      text-align: center;
+    }
+
+    .auth-info .logo {
+      width: 120px;
+      height: 120px;
+      margin-bottom: 20px;
+      border-radius: 20px;
+    }
+
+    .auth-info h1 {
+      font-size: 2.5rem;
+      margin-bottom: 15px;
+      font-weight: 300;
+    }
+
+    .auth-info h1 span {
+      font-weight: 700;
+      color: #74b9ff;
+    }
+
+    .auth-info p {
+      font-size: 1.1rem;
+      opacity: 0.9;
+      line-height: 1.6;
+    }
+
+    .auth-form {
+      flex: 1;
+      max-width: 400px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 40px;
+      border-radius: 20px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+      backdrop-filter: blur(10px);
+      margin: 20px;
+    }
+
+    .auth-form h2 {
+      color: #2d3436;
+      margin-bottom: 30px;
+      text-align: center;
+      font-size: 2rem;
+      font-weight: 600;
+    }
+
+    .input-group {
+      margin-bottom: 20px;
+    }
+
+    .input-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #2d3436;
+      font-weight: 500;
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 15px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      font-size: 16px;
+      transition: all 0.3s ease;
+      background: white;
+    }
+
+    .input-group input:focus {
+      outline: none;
+      border-color: #74b9ff;
+      box-shadow: 0 0 0 3px rgba(116, 185, 255, 0.1);
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #74b9ff, #0984e3);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 10px;
+    }
+
+    .submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 5px 15px rgba(116, 185, 255, 0.4);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .divider {
+      text-align: center;
+      margin: 25px 0;
+      position: relative;
+    }
+
+    .divider::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: #e0e0e0;
+    }
+
+    .divider span {
+      background: white;
+      padding: 0 15px;
+      color: #666;
+      font-size: 14px;
+    }
+
+    .social-login {
+      margin-bottom: 20px;
+    }
+
+    .google-btn {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 10px;
+      background: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .google-btn:hover {
+      border-color: #74b9ff;
+      transform: translateY(-1px);
+    }
+
+    .google-btn img {
+      width: 20px;
+      height: 20px;
+    }
+
+    .message {
+      padding: 12px;
+      border-radius: 8px;
+      margin: 15px 0;
+      text-align: center;
+      font-weight: 500;
+    }
+
+    .message.success {
+      background: rgba(46, 204, 113, 0.2);
+      border: 1px solid rgba(46, 204, 113, 0.5);
+      color: #27ae60;
+    }
+
+    .message.error {
+      background: rgba(231, 76, 60, 0.2);
+      border: 1px solid rgba(231, 76, 60, 0.5);
+      color: #c0392b;
+    }
+
+    .message.info {
+      background: rgba(116, 185, 255, 0.2);
+      border: 1px solid rgba(116, 185, 255, 0.5);
+      color: #0984e3;
+    }
+
+    .auth-links {
+      text-align: center;
+      margin-top: 20px;
+      color: #666;
+    }
+
+    .auth-links a {
+      color: #74b9ff;
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .auth-links a:hover {
+      text-decoration: underline;
+    }
+
+    .password-requirements {
+      font-size: 12px;
+      color: #666;
+      margin-top: 5px;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .auth-container {
+        flex-direction: column;
+        padding: 10px;
+      }
+      
+      .auth-info, .auth-form {
+        max-width: 100%;
+        margin: 10px 0;
+      }
+      
+      .auth-info {
+        padding: 20px;
+      }
+      
+      .auth-form {
+        padding: 30px 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 🔹 Background Video -->
+  <video autoplay muted loop id="bg-video">
+    <source src="figures/IceBack.mp4" type="video/mp4">
+    Your browser does not support the video tag.
+  </video>
+  
+  <div class="auth-container">
+    <div class="auth-info">
+      <img src="figures/logo.png" alt="IceStore Logo" class="logo">
+      <h1>Join <span>IceStore</span></h1>
+      <p>Securely store, organize, and access your files in the cloud.</p>
+    </div>
+
+    <div class="auth-form">
+      <h2>Create Account</h2>
+      <form id="signupForm">
+        <div class="input-group">
+          <label>Email</label>
+          <input type="email" id="email" required placeholder="example@brrrt.com">
+        </div>
+        
+        <div class="input-group">
+          <label>Username</label>
+          <input type="text" id="username" required placeholder="Choose a username (min. 3 characters)">
+        </div>
+        
+        <div class="input-group">
+          <label>Password</label>
+          <input type="password" id="password" required placeholder="Enter password (min. 6 characters)">
+          <div class="password-requirements">Must be at least 6 characters</div>
+        </div>
+        
+        <div class="input-group">
+          <label>Confirm Password</label>
+          <input type="password" id="confirmPassword" required placeholder="Confirm password">
+        </div>
+        
+        <button type="submit" class="submit-btn">Sign Up</button>
+
+        <div class="divider">
+          <span>or</span>
+        </div>
+
+        <div class="social-login">
+          <button type="button" id="googleSignupBtn" class="google-btn">
+            <img src="figures/google.png" alt="Google Logo">
+            Sign up with Google
+          </button>
+        </div>
+
+        <p class="message" id="signupMessage"></p>
+
+        <div class="auth-links">
+          Already have an account? <a href="login.html">Log in</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Backend Integration Script -->
+  <script>
+    const API_BASE_URL = 'http://localhost:3000/api/auth';
+
+    document.getElementById('signupForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const email = document.getElementById('email').value;
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
+      const messageElement = document.getElementById('signupMessage');
+      const submitBtn = document.querySelector('.submit-btn');
+      
+      // Clear previous messages
+      messageElement.textContent = '';
+      messageElement.className = 'message';
+      
+      // Frontend validation
+      if (password !== confirmPassword) {
+        messageElement.textContent = 'Passwords do not match';
+        messageElement.className = 'message error';
+        return;
+      }
+      
+      if (password.length < 6) {
+        messageElement.textContent = 'Password must be at least 6 characters';
+        messageElement.className = 'message error';
+        return;
+      }
+      
+      if (username.length < 3) {
+        messageElement.textContent = 'Username must be at least 3 characters';
+        messageElement.className = 'message error';
+        return;
+      }
+
+      // Show loading state
+      submitBtn.textContent = 'Creating Account...';
+      submitBtn.disabled = true;
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/signup`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            email, 
+            username, 
+            password, 
+            confirmPassword 
+          })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          messageElement.textContent = 'Account created successfully! Redirecting...';
+          messageElement.className = 'message success';
+          
+          // Store token and user data in localStorage
+          localStorage.setItem('token', data.token);
+          localStorage.setItem('user', JSON.stringify(data.user));
+          
+          // Redirect to dashboard after 1.5 seconds
+          setTimeout(() => {
+            window.location.href = 'dashboard.html';
+          }, 1500);
+        } else {
+          messageElement.textContent = data.error || 'Registration failed. Please try again.';
+          messageElement.className = 'message error';
+        }
+      } catch (error) {
+        console.error('Signup error:', error);
+        messageElement.textContent = 'Network error. Please check your connection and try again.';
+        messageElement.className = 'message error';
+      } finally {
+        // Reset button state
+        submitBtn.textContent = 'Sign Up';
+        submitBtn.disabled = false;
+      }
+    });
+
+    // Google Signup Handler
+    document.getElementById('googleSignupBtn').addEventListener('click', () => {
+      const messageElement = document.getElementById('signupMessage');
+      messageElement.textContent = 'Google signup integration coming soon!';
+      messageElement.className = 'message info';
+    });
+
+    // Real-time password validation
+    document.getElementById('password').addEventListener('input', function() {
+      const password = this.value;
+      const messageElement = document.getElementById('signupMessage');
+      
+      if (password.length > 0 && password.length < 6) {
+        messageElement.textContent = 'Password must be at least 6 characters';
+        messageElement.className = 'message error';
+      } else if (password.length >= 6) {
+        messageElement.textContent = '';
+        messageElement.className = 'message';
+      }
+    });
+
+    // Real-time password match checking
+    document.getElementById('confirmPassword').addEventListener('input', function() {
+      const password = document.getElementById('password').value;
+      const confirmPassword = this.value;
+      const messageElement = document.getElementById('signupMessage');
+      
+      if (confirmPassword.length > 0 && password !== confirmPassword) {
+        messageElement.textContent = 'Passwords do not match';
+        messageElement.className = 'message error';
+      } else if (confirmPassword.length > 0 && password === confirmPassword) {
+        messageElement.textContent = 'Passwords match!';
+        messageElement.className = 'message success';
+      }
+    });
+
+    // Check if user is already logged in
+    document.addEventListener('DOMContentLoaded', () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        window.location.href = 'dashboard.html';
+      }
+    });
+  </script>
+</body>
+</html>
