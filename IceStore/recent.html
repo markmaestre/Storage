@@ -347,6 +347,15 @@
       padding: 15px 0;
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
       gap: 15px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .activity-item:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding: 15px;
+      margin: 0 -15px;
     }
 
     .activity-icon {
@@ -379,6 +388,59 @@
       color: #888;
       font-size: 0.8em;
       white-space: nowrap;
+    }
+
+    /* Loading Spinner */
+    .loading-spinner {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 40px;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #00BFFF;
+      animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Notification styles */
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 15px 20px;
+      color: white;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 1000;
+      transform: translateX(400px);
+      transition: transform 0.3s ease;
+      max-width: 300px;
+      word-wrap: break-word;
+      backdrop-filter: blur(10px);
+    }
+
+    .notification.success {
+      background: rgba(76, 175, 80, 0.9);
+      border: 1px solid rgba(76, 175, 80, 0.5);
+    }
+
+    .notification.error {
+      background: rgba(244, 67, 54, 0.9);
+      border: 1px solid rgba(244, 67, 54, 0.5);
+    }
+
+    .notification.info {
+      background: rgba(33, 150, 243, 0.9);
+      border: 1px solid rgba(33, 150, 243, 0.5);
     }
 
     /* Responsive Design */
@@ -455,7 +517,7 @@
         <div class="sidebar-progress-fill" id="storage-progress"></div>
       </div>
       <p style="margin: 0; color: #ccc; font-size: 0.9em;" id="storage-text">0.00 GB of 15 GB used</p>
-      <button class="storage-btn">Get more storage</button>
+      <button class="storage-btn" onclick="window.location.href='storage.html'">Get more storage</button>
     </div>
   </div>
   
@@ -479,13 +541,18 @@
       <p>Your recently accessed and modified files</p>
     </div>
     
+    <!-- Loading Spinner -->
+    <div class="loading-spinner" id="loading-spinner">
+      <div class="spinner"></div>
+    </div>
+    
     <!-- Recent Activity List -->
     <div class="activity-list" id="activity-list">
       <!-- Activity items will be populated by JavaScript -->
     </div>
 
     <!-- Empty State -->
-    <div class="empty-state-content" id="empty-state">
+    <div class="empty-state-content" id="empty-state" style="display: none;">
       <span class="material-icons">schedule</span>
       <p>No Recent Activity</p>
       <p>Your recent file activities will appear here</p>
@@ -507,8 +574,9 @@
   </template>
 
   <script>
-    const API_BASE_URL = 'http://localhost:3000/api/auth';
+    const API_BASE_URL = 'http://localhost:3000/api';
     let recentActivities = [];
+    let currentUser = null;
 
     // Initialize recent page
     async function initRecent() {
@@ -524,15 +592,17 @@
       }
 
       try {
-        const user = JSON.parse(userData);
-        updateUserDisplay(user);
-        await loadRecentActivities(user);
-        updateStorageUsage();
+        currentUser = JSON.parse(userData);
+        updateUserDisplay(currentUser);
+        await loadRecentActivities(token);
+        await updateStorageUsage(token);
         
         console.log('Recent page initialized with', recentActivities.length, 'activities');
       } catch (error) {
         console.error('Error initializing recent page:', error);
-        window.location.href = 'login.html';
+        if (error.message.includes('Unauthorized') || error.message.includes('401')) {
+          window.location.href = 'login.html';
+        }
       }
     }
 
@@ -548,62 +618,96 @@
       if (userAvatarElement) userAvatarElement.textContent = (user.username || 'U').charAt(0).toUpperCase();
     }
 
-    async function loadRecentActivities(user) {
-      console.log('Loading recent activities for user:', user.id);
+    async function loadRecentActivities(token) {
+      console.log('Loading recent activities from API...');
       
       try {
-        // Load from localStorage for demo purposes
-        const userFileKey = `icestore_files_${user.id}`;
-        const savedFiles = localStorage.getItem(userFileKey);
+        showLoading(true);
         
-        if (savedFiles) {
-          const files = JSON.parse(savedFiles);
-          // Generate recent activities from files
-          recentActivities = generateRecentActivities(files);
-        } else {
-          recentActivities = [];
+        const response = await fetch(`${API_BASE_URL}/files/recent`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          // If the endpoint doesn't exist, show a helpful message
+          if (response.status === 404) {
+            showNotification('Recent activities feature is not available yet', 'info');
+            recentActivities = [];
+            displayRecentActivities();
+            return;
+          }
+          throw new Error(`Failed to fetch recent activities: ${response.status}`);
         }
         
-        displayRecentActivities();
+        const data = await response.json();
+        console.log('Recent activities response:', data);
+        
+        if (data.success) {
+          recentActivities = data.activities || [];
+          console.log('Loaded recent activities:', recentActivities);
+          
+          // If no activities from backend, show demo data for testing
+          if (recentActivities.length === 0) {
+            recentActivities = generateDemoActivities();
+            console.log('Using demo activities:', recentActivities);
+          }
+          
+          displayRecentActivities();
+        } else {
+          throw new Error(data.error || 'Failed to load recent activities');
+        }
       } catch (error) {
         console.error('Error loading recent activities:', error);
-        recentActivities = [];
+        // Fallback to demo data for testing
+        recentActivities = generateDemoActivities();
         displayRecentActivities();
+        showNotification('Using demo data - backend connection issue', 'info');
+      } finally {
+        showLoading(false);
       }
     }
 
-    function generateRecentActivities(files) {
-      const activities = [];
-      const activityTypes = ['uploaded', 'modified', 'viewed', 'shared'];
-      
-      files.forEach(file => {
-        // Create multiple activities for each file to simulate recent activity
-        activities.push({
-          id: 'activity_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-          fileId: file.id,
-          fileName: file.name,
-          type: 'uploaded',
-          description: `You uploaded ${file.name}`,
-          timestamp: new Date(file.uploadDate).getTime(),
-          icon: 'file_upload'
-        });
-
-        // Add some random recent activities
-        if (Math.random() > 0.5) {
-          activities.push({
-            id: 'activity_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-            fileId: file.id,
-            fileName: file.name,
-            type: 'viewed',
-            description: `You viewed ${file.name}`,
-            timestamp: new Date(Date.now() - Math.random() * 86400000).getTime(), // Random time in last 24 hours
-            icon: 'visibility'
-          });
+    function generateDemoActivities() {
+      const demoActivities = [
+        {
+          id: 'activity_1',
+          type: 'upload',
+          fileName: 'Project Report.pdf',
+          description: 'You uploaded Project Report.pdf',
+          timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+          file: { id: 'file_1' }
+        },
+        {
+          id: 'activity_2',
+          type: 'download',
+          fileName: 'Team Photos.zip',
+          description: 'You downloaded Team Photos.zip',
+          timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000), // 5 hours ago
+          file: { id: 'file_2' }
+        },
+        {
+          id: 'activity_3',
+          type: 'share',
+          fileName: 'Financial Data.xlsx',
+          description: 'You shared Financial Data.xlsx with john@example.com',
+          timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+          file: { id: 'file_3' }
+        },
+        {
+          id: 'activity_4',
+          type: 'view',
+          fileName: 'Meeting Notes.docx',
+          description: 'You viewed Meeting Notes.docx',
+          timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+          file: { id: 'file_4' }
         }
-      });
-
-      // Sort by timestamp (newest first)
-      return activities.sort((a, b) => b.timestamp - a.timestamp);
+      ];
+      
+      return demoActivities;
     }
 
     function displayRecentActivities() {
@@ -641,12 +745,12 @@
         if (icon) icon.textContent = getActivityIcon(activity.type);
         
         if (title) title.textContent = activity.fileName;
-        if (description) description.textContent = activity.description;
-        if (time) time.textContent = formatTimeAgo(activity.timestamp);
+        if (description) description.textContent = activity.description || generateActivityDescription(activity);
+        if (time) time.textContent = formatTimeAgo(new Date(activity.timestamp || activity.createdAt));
         
         if (activityItem) {
-          activityItem.setAttribute('data-activity-id', activity.id);
-          activityItem.setAttribute('data-file-id', activity.fileId);
+          activityItem.setAttribute('data-activity-id', activity.id || activity._id);
+          activityItem.setAttribute('data-file-id', activity.fileId || (activity.file ? activity.file.id : ''));
           
           // Add click event
           activityItem.addEventListener('click', function() {
@@ -658,21 +762,44 @@
       });
     }
 
+    function generateActivityDescription(activity) {
+      const descriptions = {
+        upload: `You uploaded ${activity.fileName}`,
+        download: `You downloaded ${activity.fileName}`,
+        view: `You viewed ${activity.fileName}`,
+        share: `You shared ${activity.fileName}`,
+        rename: `You renamed a file to ${activity.fileName}`,
+        move: `You moved ${activity.fileName}`,
+        delete: `You deleted ${activity.fileName}`,
+        restore: `You restored ${activity.fileName}`,
+        create_folder: `You created folder ${activity.fileName}`
+      };
+      
+      return descriptions[activity.type] || `You performed ${activity.type} on ${activity.fileName}`;
+    }
+
     function getActivityIcon(activityType) {
       const iconMap = {
-        'uploaded': 'file_upload',
-        'modified': 'edit',
-        'viewed': 'visibility',
-        'shared': 'share',
-        'downloaded': 'download'
+        'upload': 'file_upload',
+        'download': 'download',
+        'view': 'visibility',
+        'share': 'share',
+        'rename': 'drive_file_rename_outline',
+        'move': 'drive_file_move',
+        'delete': 'delete',
+        'restore': 'restore',
+        'create_folder': 'create_new_folder'
       };
       
       return iconMap[activityType] || 'description';
     }
 
     function formatTimeAgo(timestamp) {
+      if (!timestamp) return 'Unknown time';
+      
       const now = new Date().getTime();
-      const diff = now - timestamp;
+      const date = new Date(timestamp);
+      const diff = now - date.getTime();
       
       const minutes = Math.floor(diff / 60000);
       const hours = Math.floor(diff / 3600000);
@@ -683,45 +810,168 @@
       if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
       if (days < 7) return `${days} day${days > 1 ? 's' : ''} ago`;
       
-      return new Date(timestamp).toLocaleDateString();
+      return date.toLocaleDateString();
     }
 
     function openFileFromActivity(element) {
       const fileId = element.getAttribute('data-file-id');
-      const activity = recentActivities.find(a => a.fileId === fileId);
+      const activityId = element.getAttribute('data-activity-id');
+      const activity = recentActivities.find(a => (a.id === activityId) || (a._id === activityId));
       
-      if (activity) {
-        alert(`Opening: ${activity.fileName}\n\nActivity: ${activity.description}\nTime: ${formatTimeAgo(activity.timestamp)}`);
+      if (activity && fileId) {
+        // Download the file if it exists and belongs to the user
+        downloadFile(fileId);
+      } else if (activity) {
+        showNotification(`Activity: ${activity.description || generateActivityDescription(activity)}`, 'info');
       }
     }
 
-    function updateStorageUsage() {
-      const userData = localStorage.getItem('user');
-      if (!userData) return;
+    async function downloadFile(fileId) {
+      const token = localStorage.getItem('token');
       
-      const user = JSON.parse(userData);
-      const userFileKey = `icestore_files_${user.id}`;
-      const savedFiles = localStorage.getItem(userFileKey);
-      
-      if (savedFiles) {
-        const files = JSON.parse(savedFiles);
-        const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-        const totalSizeGB = totalSize / (1024 * 1024 * 1024);
-        const maxStorageGB = 15;
+      if (!fileId || fileId === '') {
+        showNotification('File not available for download', 'error');
+        return;
+      }
+
+      try {
+        showNotification('Downloading file...', 'info');
         
-        const usagePercentage = Math.min((totalSizeGB / maxStorageGB) * 100, 100);
+        const response = await fetch(`${API_BASE_URL}/files/${fileId}/download`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         
+        if (!response.ok) {
+          if (response.status === 403) {
+            throw new Error('Access denied. You do not have permission to download this file.');
+          }
+          if (response.status === 404) {
+            throw new Error('File not found.');
+          }
+          throw new Error(`Failed to download file: ${response.status}`);
+        }
+        
+        // Get filename from Content-Disposition header or use a default
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = 'download';
+        
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+          if (filenameMatch) {
+            filename = filenameMatch[1];
+          }
+        }
+        
+        // Create blob and download
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        showNotification('File downloaded successfully!', 'success');
+        
+      } catch (error) {
+        console.error('Error downloading file:', error);
+        showNotification('Failed to download file: ' + error.message, 'error');
+      }
+    }
+
+    async function updateStorageUsage(token) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/storage/overview`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch storage overview: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          const overview = data.overview;
+          const usedStorageGB = overview.total.used / (1024 * 1024 * 1024);
+          const maxStorageGB = overview.total.total / (1024 * 1024 * 1024);
+          const usagePercentage = Math.min((usedStorageGB / maxStorageGB) * 100, 100);
+          
+          const progressFill = document.getElementById('storage-progress');
+          const usageText = document.getElementById('storage-text');
+          
+          if (progressFill) {
+            progressFill.style.width = `${usagePercentage}%`;
+          }
+          
+          if (usageText) {
+            usageText.textContent = `${usedStorageGB.toFixed(2)} GB of ${maxStorageGB} GB used`;
+          }
+        }
+      } catch (error) {
+        console.error('Error updating storage usage:', error);
+        // Fallback to default values
         const progressFill = document.getElementById('storage-progress');
         const usageText = document.getElementById('storage-text');
         
         if (progressFill) {
-          progressFill.style.width = `${usagePercentage}%`;
+          progressFill.style.width = '0%';
         }
         
         if (usageText) {
-          usageText.textContent = `${totalSizeGB.toFixed(2)} GB of ${maxStorageGB} GB used`;
+          usageText.textContent = '0.00 GB of 15 GB used';
         }
       }
+    }
+
+    function showLoading(show) {
+      const loadingSpinner = document.getElementById('loading-spinner');
+      const activityList = document.getElementById('activity-list');
+      const emptyState = document.getElementById('empty-state');
+      
+      if (loadingSpinner) {
+        loadingSpinner.style.display = show ? 'flex' : 'none';
+      }
+      
+      if (activityList) {
+        activityList.style.display = show ? 'none' : 'block';
+      }
+      
+      if (emptyState && !show && recentActivities.length === 0) {
+        emptyState.style.display = 'flex';
+      } else if (emptyState) {
+        emptyState.style.display = 'none';
+      }
+    }
+
+    function showNotification(message, type = 'info') {
+      const notification = document.createElement('div');
+      notification.className = `notification ${type}`;
+      notification.textContent = message;
+      
+      document.body.appendChild(notification);
+      
+      setTimeout(() => {
+        notification.style.transform = 'translateX(0)';
+      }, 100);
+      
+      setTimeout(() => {
+        notification.style.transform = 'translateX(400px)';
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 300);
+      }, 3000);
     }
 
     function logout() {

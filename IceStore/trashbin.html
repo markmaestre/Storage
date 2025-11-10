@@ -388,6 +388,27 @@
       margin: 0;
     }
 
+    /* Loading Spinner */
+    .loading-spinner {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 40px;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #00BFFF;
+      animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
     /* Responsive Design */
     @media (max-width: 768px) {
       .sidebar {
@@ -499,11 +520,16 @@
       </button>
     </div>
     
+    <!-- Loading Spinner -->
+    <div class="loading-spinner" id="loading-spinner">
+      <div class="spinner"></div>
+    </div>
+    
     <!-- File Container -->
     <div class="file-container" id="file-container"></div>
     
     <!-- Empty State -->
-    <div class="empty-state-content" id="empty-state">
+    <div class="empty-state-content" id="empty-state" style="display: none;">
       <span class="material-icons">delete_outline</span>
       <p>Trash is Empty</p>
       <p>Deleted files will appear here</p>
@@ -534,8 +560,9 @@
   </template>
 
   <script>
-    const API_BASE_URL = 'http://localhost:3000/api/auth';
+    const API_BASE_URL = 'http://localhost:3000/api';
     let trashFiles = [];
+    let currentUser = null;
 
     // Initialize trash page
     async function initTrash() {
@@ -551,15 +578,17 @@
       }
 
       try {
-        const user = JSON.parse(userData);
-        updateUserDisplay(user);
-        await loadTrashFiles(user);
-        updateStorageUsage();
+        currentUser = JSON.parse(userData);
+        updateUserDisplay(currentUser);
+        await loadTrashFiles(token);
+        await updateStorageUsage(token);
         
         console.log('Trash page initialized with', trashFiles.length, 'files');
       } catch (error) {
         console.error('Error initializing trash page:', error);
-        window.location.href = 'login.html';
+        if (error.message.includes('Unauthorized') || error.message.includes('401')) {
+          window.location.href = 'login.html';
+        }
       }
     }
 
@@ -575,60 +604,40 @@
       if (userAvatarElement) userAvatarElement.textContent = (user.username || 'U').charAt(0).toUpperCase();
     }
 
-    async function loadTrashFiles(user) {
-      console.log('Loading trash files for user:', user.id);
+    async function loadTrashFiles(token) {
+      console.log('Loading trash files from API...');
       
       try {
-        // Load from localStorage for demo purposes
-        const trashFileKey = `icestore_trash_${user.id}`;
-        const savedTrashFiles = localStorage.getItem(trashFileKey);
+        showLoading(true);
         
-        if (savedTrashFiles) {
-          trashFiles = JSON.parse(savedTrashFiles);
-        } else {
-          // Generate demo trash files
-          trashFiles = generateDemoTrashFiles(user);
-          localStorage.setItem(trashFileKey, JSON.stringify(trashFiles));
+        const response = await fetch(`${API_BASE_URL}/files/trash`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch trash files: ${response.status}`);
         }
         
-        displayTrashFiles();
+        const data = await response.json();
+        
+        if (data.success) {
+          trashFiles = data.files || [];
+          displayTrashFiles();
+        } else {
+          throw new Error(data.error || 'Failed to load trash files');
+        }
       } catch (error) {
         console.error('Error loading trash files:', error);
         trashFiles = [];
         displayTrashFiles();
+        alert('Failed to load trash files: ' + error.message);
+      } finally {
+        showLoading(false);
       }
-    }
-
-    function generateDemoTrashFiles(user) {
-      return [
-        {
-          id: 'trash_1',
-          name: 'Old Report.pdf',
-          type: 'pdf',
-          size: 1548576,
-          originalUploadDate: new Date(Date.now() - 86400000 * 5).toISOString(),
-          deletedDate: new Date(Date.now() - 86400000 * 2).toISOString(),
-          originalLocation: 'My Files/Reports'
-        },
-        {
-          id: 'trash_2',
-          name: 'Temporary Files.zip',
-          type: 'archive',
-          size: 25485760,
-          originalUploadDate: new Date(Date.now() - 86400000 * 10).toISOString(),
-          deletedDate: new Date(Date.now() - 86400000).toISOString(),
-          originalLocation: 'My Files/Temp'
-        },
-        {
-          id: 'trash_3',
-          name: 'Draft Document.docx',
-          type: 'document',
-          size: 54576,
-          originalUploadDate: new Date(Date.now() - 86400000 * 3).toISOString(),
-          deletedDate: new Date(Date.now() - 86400000 * 1).toISOString(),
-          originalLocation: 'My Files/Drafts'
-        }
-      ];
     }
 
     function displayTrashFiles() {
@@ -670,9 +679,9 @@
         if (icon) icon.textContent = iconName;
         
         if (name) name.textContent = file.name;
-        if (deletedDate) deletedDate.textContent = `Deleted ${formatTimeAgo(file.deletedDate)}`;
+        if (deletedDate) deletedDate.textContent = `Deleted ${formatTimeAgo(file.deletedAt)}`;
         if (size) size.textContent = formatFileSize(file.size);
-        if (date) date.textContent = `Originally uploaded ${formatDate(file.originalUploadDate)}`;
+        if (date) date.textContent = `Originally uploaded ${formatDate(file.uploadDate)}`;
         
         if (fileItem) {
           fileItem.setAttribute('data-index', index);
@@ -755,119 +764,222 @@
       return `${days} day${days > 1 ? 's' : ''} ago`;
     }
 
-    function restoreFile(element) {
+    async function restoreFile(element) {
       const fileItem = element.closest('.file-item');
-      const index = fileItem.getAttribute('data-index');
-      const file = trashFiles[index];
+      const fileId = fileItem.getAttribute('data-file-id');
       
-      if (confirm(`Restore "${file.name}" to its original location?`)) {
-        // Remove from trash
-        trashFiles.splice(index, 1);
-        
-        // Update localStorage
-        const userData = localStorage.getItem('user');
-        if (userData) {
-          const user = JSON.parse(userData);
-          const trashFileKey = `icestore_trash_${user.id}`;
-          localStorage.setItem(trashFileKey, JSON.stringify(trashFiles));
+      if (confirm(`Restore this file?`)) {
+        try {
+          const token = localStorage.getItem('token');
+          const response = await fetch(`${API_BASE_URL}/files/${fileId}/restore`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Failed to restore file: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            // Reload trash files
+            await loadTrashFiles(token);
+            alert(data.message || 'File has been restored successfully.');
+          } else {
+            throw new Error(data.error || 'Failed to restore file');
+          }
+        } catch (error) {
+          console.error('Error restoring file:', error);
+          alert('Failed to restore file: ' + error.message);
         }
-        
-        displayTrashFiles();
-        alert(`"${file.name}" has been restored.`);
       }
     }
 
-    function deletePermanently(element) {
+    async function deletePermanently(element) {
       const fileItem = element.closest('.file-item');
-      const index = fileItem.getAttribute('data-index');
-      const file = trashFiles[index];
+      const fileId = fileItem.getAttribute('data-file-id');
       
-      if (confirm(`Permanently delete "${file.name}"? This action cannot be undone.`)) {
-        trashFiles.splice(index, 1);
-        
-        // Update localStorage
-        const userData = localStorage.getItem('user');
-        if (userData) {
-          const user = JSON.parse(userData);
-          const trashFileKey = `icestore_trash_${user.id}`;
-          localStorage.setItem(trashFileKey, JSON.stringify(trashFiles));
+      if (confirm(`Permanently delete this file? This action cannot be undone.`)) {
+        try {
+          const token = localStorage.getItem('token');
+          const response = await fetch(`${API_BASE_URL}/files/${fileId}`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Failed to delete file: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            // Reload trash files
+            await loadTrashFiles(token);
+            alert(data.message || 'File has been permanently deleted.');
+          } else {
+            throw new Error(data.error || 'Failed to delete file');
+          }
+        } catch (error) {
+          console.error('Error deleting file:', error);
+          alert('Failed to delete file: ' + error.message);
         }
-        
-        displayTrashFiles();
-        alert(`"${file.name}" has been permanently deleted.`);
       }
     }
 
-    function restoreAllFiles() {
+    async function restoreAllFiles() {
       if (trashFiles.length === 0) {
         alert('Trash is already empty.');
         return;
       }
       
       if (confirm(`Restore all ${trashFiles.length} files from trash?`)) {
-        trashFiles = [];
-        
-        // Update localStorage
-        const userData = localStorage.getItem('user');
-        if (userData) {
-          const user = JSON.parse(userData);
-          const trashFileKey = `icestore_trash_${user.id}`;
-          localStorage.setItem(trashFileKey, JSON.stringify(trashFiles));
+        try {
+          const token = localStorage.getItem('token');
+          
+          // Restore each file individually
+          let restoredCount = 0;
+          for (const file of trashFiles) {
+            try {
+              const response = await fetch(`${API_BASE_URL}/files/${file.id}/restore`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                }
+              });
+              
+              if (response.ok) {
+                restoredCount++;
+              }
+            } catch (error) {
+              console.error(`Error restoring file ${file.id}:`, error);
+            }
+          }
+          
+          // Reload trash files
+          await loadTrashFiles(token);
+          alert(`Successfully restored ${restoredCount} out of ${trashFiles.length} files.`);
+        } catch (error) {
+          console.error('Error restoring all files:', error);
+          alert('Failed to restore all files: ' + error.message);
         }
-        
-        displayTrashFiles();
-        alert('All files have been restored.');
       }
     }
 
-    function emptyTrash() {
+    async function emptyTrash() {
       if (trashFiles.length === 0) {
         alert('Trash is already empty.');
         return;
       }
       
       if (confirm(`Permanently delete all ${trashFiles.length} files in trash? This action cannot be undone.`)) {
-        trashFiles = [];
-        
-        // Update localStorage
-        const userData = localStorage.getItem('user');
-        if (userData) {
-          const user = JSON.parse(userData);
-          const trashFileKey = `icestore_trash_${user.id}`;
-          localStorage.setItem(trashFileKey, JSON.stringify(trashFiles));
+        try {
+          const token = localStorage.getItem('token');
+          const response = await fetch(`${API_BASE_URL}/files/trash/empty`, {
+            method: 'DELETE',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `Failed to empty trash: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            // Reload trash files
+            await loadTrashFiles(token);
+            alert(data.message || 'Trash has been emptied successfully.');
+          } else {
+            throw new Error(data.error || 'Failed to empty trash');
+          }
+        } catch (error) {
+          console.error('Error emptying trash:', error);
+          alert('Failed to empty trash: ' + error.message);
         }
-        
-        displayTrashFiles();
-        alert('Trash has been emptied.');
       }
     }
 
-    function updateStorageUsage() {
-      const userData = localStorage.getItem('user');
-      if (!userData) return;
-      
-      const user = JSON.parse(userData);
-      const userFileKey = `icestore_files_${user.id}`;
-      const savedFiles = localStorage.getItem(userFileKey);
-      
-      if (savedFiles) {
-        const files = JSON.parse(savedFiles);
-        const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-        const totalSizeGB = totalSize / (1024 * 1024 * 1024);
-        const maxStorageGB = 15;
+    async function updateStorageUsage(token) {
+      try {
+        const response = await fetch(`${API_BASE_URL}/storage/overview`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
         
-        const usagePercentage = Math.min((totalSizeGB / maxStorageGB) * 100, 100);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch storage overview: ${response.status}`);
+        }
         
+        const data = await response.json();
+        
+        if (data.success) {
+          const overview = data.overview;
+          const usedStorageGB = overview.total.used / (1024 * 1024 * 1024);
+          const maxStorageGB = overview.total.total / (1024 * 1024 * 1024);
+          const usagePercentage = Math.min((usedStorageGB / maxStorageGB) * 100, 100);
+          
+          const progressFill = document.getElementById('storage-progress');
+          const usageText = document.getElementById('storage-text');
+          
+          if (progressFill) {
+            progressFill.style.width = `${usagePercentage}%`;
+          }
+          
+          if (usageText) {
+            usageText.textContent = `${usedStorageGB.toFixed(2)} GB of ${maxStorageGB} GB used`;
+          }
+        }
+      } catch (error) {
+        console.error('Error updating storage usage:', error);
+        // Fallback to default values
         const progressFill = document.getElementById('storage-progress');
         const usageText = document.getElementById('storage-text');
         
         if (progressFill) {
-          progressFill.style.width = `${usagePercentage}%`;
+          progressFill.style.width = '0%';
         }
         
         if (usageText) {
-          usageText.textContent = `${totalSizeGB.toFixed(2)} GB of ${maxStorageGB} GB used`;
+          usageText.textContent = '0.00 GB of 15 GB used';
         }
+      }
+    }
+
+    function showLoading(show) {
+      const loadingSpinner = document.getElementById('loading-spinner');
+      const fileContainer = document.getElementById('file-container');
+      const emptyState = document.getElementById('empty-state');
+      
+      if (loadingSpinner) {
+        loadingSpinner.style.display = show ? 'flex' : 'none';
+      }
+      
+      if (fileContainer) {
+        fileContainer.style.display = show ? 'none' : 'grid';
+      }
+      
+      if (emptyState && !show && trashFiles.length === 0) {
+        emptyState.style.display = 'flex';
+      } else if (emptyState) {
+        emptyState.style.display = 'none';
       }
     }
 

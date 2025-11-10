@@ -426,6 +426,83 @@
       transform: translateY(-2px);
     }
 
+    /* Loading Spinner */
+    .loading-spinner {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 40px;
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #00BFFF;
+      animation: spin 1s ease-in-out infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* File Type Breakdown */
+    .file-type-breakdown {
+      margin-top: 15px;
+    }
+
+    .file-type-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .file-type-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #ccc;
+    }
+
+    .file-type-icon {
+      width: 20px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .file-type-size {
+      color: #00BFFF;
+      font-weight: 500;
+    }
+
+    /* Error and Debug Styles */
+    .error-message {
+      background: rgba(255, 71, 87, 0.2);
+      border: 1px solid rgba(255, 71, 87, 0.5);
+      color: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 40px;
+      text-align: center;
+    }
+
+    .debug-info {
+      background: rgba(0, 191, 255, 0.1);
+      border: 1px solid rgba(0, 191, 255, 0.3);
+      color: #ccc;
+      padding: 10px;
+      border-radius: 6px;
+      margin: 10px 0;
+      font-size: 0.8em;
+      font-family: monospace;
+    }
+
     /* Responsive Design */
     @media (max-width: 768px) {
       .sidebar {
@@ -504,7 +581,7 @@
         <div class="sidebar-progress-fill" id="storage-progress"></div>
       </div>
       <p style="margin: 0; color: #ccc; font-size: 0.9em;" id="storage-text">0.00 GB of 15 GB used</p>
-      <button class="storage-btn">Get more storage</button>
+      <button class="storage-btn" onclick="showPlans()">Get more storage</button>
     </div>
   </div>
   
@@ -528,16 +605,27 @@
       <p>Monitor your storage usage and upgrade your plan</p>
     </div>
 
+    <!-- Loading Spinner -->
+    <div class="loading-spinner" id="loading-spinner">
+      <div class="spinner"></div>
+    </div>
+
+    <!-- Error Message -->
+    <div class="error-message" id="error-message" style="display: none;"></div>
+
+    <!-- Debug Info (remove in production) -->
+    <div class="debug-info" id="debug-info" style="display: none;"></div>
+
     <!-- Storage Overview -->
-    <div class="storage-overview">
+    <div class="storage-overview" id="storage-overview" style="display: none;">
       <div class="storage-card">
         <h3><span class="material-icons">storage</span> Total Storage</h3>
         <div class="storage-progress">
           <div class="progress-bar">
-            <div class="progress-fill" id="total-progress" style="width: 25%; background: linear-gradient(90deg, #00BFFF, #4DEEE8);"></div>
+            <div class="progress-fill" id="total-progress" style="width: 0%; background: linear-gradient(90deg, #00BFFF, #4DEEE8);"></div>
           </div>
           <div class="progress-details">
-            <span id="used-storage">3.75 GB</span>
+            <span id="used-storage">0 GB</span>
             <span id="total-storage">15 GB</span>
           </div>
         </div>
@@ -550,46 +638,21 @@
             <div class="stat-value" id="folder-count">0</div>
             <div class="stat-label">Folders</div>
           </div>
+          <div class="stat-item">
+            <div class="stat-value" id="total-items">0</div>
+            <div class="stat-label">Total Items</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="usage-percentage">0%</div>
+            <div class="stat-label">Used</div>
+          </div>
         </div>
       </div>
 
       <div class="storage-card">
         <h3><span class="material-icons">category</span> Storage by Type</h3>
-        <div class="storage-progress">
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: 40%; background: #00BFFF;"></div>
-          </div>
-          <div class="progress-details">
-            <span>Documents</span>
-            <span>1.5 GB</span>
-          </div>
-        </div>
-        <div class="storage-progress">
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: 25%; background: #4DEEE8;"></div>
-          </div>
-          <div class="progress-details">
-            <span>Images</span>
-            <span>0.9 GB</span>
-          </div>
-        </div>
-        <div class="storage-progress">
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: 20%; background: #74b9ff;"></div>
-          </div>
-          <div class="progress-details">
-            <span>Videos</span>
-            <span>0.75 GB</span>
-          </div>
-        </div>
-        <div class="storage-progress">
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: 15%; background: #0984e3;"></div>
-          </div>
-          <div class="progress-details">
-            <span>Others</span>
-            <span>0.6 GB</span>
-          </div>
+        <div id="file-type-breakdown" class="file-type-breakdown">
+          <!-- File type breakdown will be populated by JavaScript -->
         </div>
       </div>
 
@@ -597,11 +660,11 @@
         <h3><span class="material-icons">trending_up</span> Usage Trends</h3>
         <div class="storage-stats">
           <div class="stat-item">
-            <div class="stat-value">+15%</div>
+            <div class="stat-value" id="monthly-growth">0%</div>
             <div class="stat-label">This Month</div>
           </div>
           <div class="stat-item">
-            <div class="stat-value">+42%</div>
+            <div class="stat-value" id="yearly-growth">0%</div>
             <div class="stat-label">This Year</div>
           </div>
           <div class="stat-item">
@@ -617,59 +680,36 @@
     </div>
 
     <!-- Storage Plans -->
-    <div class="storage-plans">
+    <div class="storage-plans" id="storage-plans" style="display: none;">
       <h2 style="color: white; margin-bottom: 10px;">Upgrade Your Storage</h2>
       <p style="color: #ccc; margin-bottom: 20px;">Choose the plan that fits your needs</p>
       
-      <div class="plans-grid">
-        <div class="plan-card">
-          <div class="plan-name">Free</div>
-          <div class="plan-storage">15 GB</div>
-          <div class="plan-price">$0/month</div>
-          <ul class="plan-features">
-            <li><span class="material-icons">check</span> Basic file storage</li>
-            <li><span class="material-icons">check</span> File sharing</li>
-            <li><span class="material-icons">check</span> 30-day trash recovery</li>
-            <li><span class="material-icons">close</span> Advanced security</li>
-            <li><span class="material-icons">close</span> Priority support</li>
-          </ul>
-          <button class="plan-button current">Current Plan</button>
-        </div>
-
-        <div class="plan-card recommended">
-          <div class="recommended-badge">Most Popular</div>
-          <div class="plan-name">Pro</div>
-          <div class="plan-storage">100 GB</div>
-          <div class="plan-price">$2.99/month</div>
-          <ul class="plan-features">
-            <li><span class="material-icons">check</span> Everything in Free</li>
-            <li><span class="material-icons">check</span> 100 GB storage</li>
-            <li><span class="material-icons">check</span> Advanced security</li>
-            <li><span class="material-icons">check</span> Priority support</li>
-            <li><span class="material-icons">check</span> 1-year trash recovery</li>
-          </ul>
-          <button class="plan-button upgrade">Upgrade to Pro</button>
-        </div>
-
-        <div class="plan-card">
-          <div class="plan-name">Business</div>
-          <div class="plan-storage">1 TB</div>
-          <div class="plan-price">$9.99/month</div>
-          <ul class="plan-features">
-            <li><span class="material-icons">check</span> Everything in Pro</li>
-            <li><span class="material-icons">check</span> 1 TB storage</li>
-            <li><span class="material-icons">check</span> Team collaboration</li>
-            <li><span class="material-icons">check</span> Advanced analytics</li>
-            <li><span class="material-icons">check</span> 24/7 premium support</li>
-          </ul>
-          <button class="plan-button upgrade">Upgrade to Business</button>
-        </div>
+      <div class="plans-grid" id="plans-grid">
+        <!-- Plans will be populated by JavaScript -->
       </div>
     </div>
   </div>
 
+  <!-- Plan Template -->
+  <template id="plan-template">
+    <div class="plan-card">
+      <div class="plan-name">Plan Name</div>
+      <div class="plan-storage">0 GB</div>
+      <div class="plan-price">$0/month</div>
+      <ul class="plan-features">
+        <li><span class="material-icons">check</span> Feature 1</li>
+        <li><span class="material-icons">check</span> Feature 2</li>
+        <li><span class="material-icons">check</span> Feature 3</li>
+      </ul>
+      <button class="plan-button current">Current Plan</button>
+    </div>
+  </template>
+
   <script>
-    const API_BASE_URL = 'http://localhost:3000/api/auth';
+    const API_BASE_URL = 'http://localhost:3000/api';
+    let currentUser = null;
+    let storageOverview = null;
+    let storagePlans = null;
 
     // Initialize storage page
     async function initStorage() {
@@ -685,15 +725,15 @@
       }
 
       try {
-        const user = JSON.parse(userData);
-        updateUserDisplay(user);
-        await loadStorageData(user);
-        updateStorageUsage();
+        currentUser = JSON.parse(userData);
+        updateUserDisplay(currentUser);
+        await loadStorageOverview(token);
+        await loadStoragePlans(token);
         
         console.log('Storage page initialized');
       } catch (error) {
         console.error('Error initializing storage page:', error);
-        window.location.href = 'login.html';
+        showError('Failed to initialize storage page: ' + error.message);
       }
     }
 
@@ -709,70 +749,386 @@
       if (userAvatarElement) userAvatarElement.textContent = (user.username || 'U').charAt(0).toUpperCase();
     }
 
-    async function loadStorageData(user) {
-      console.log('Loading storage data for user:', user.id);
+    async function loadStorageOverview(token) {
+      console.log('Loading storage overview from API...');
       
       try {
-        // Load from localStorage for demo purposes
-        const userFileKey = `icestore_files_${user.id}`;
-        const savedFiles = localStorage.getItem(userFileKey);
+        showLoading(true);
+        hideError();
         
-        let totalSize = 0;
-        let fileCount = 0;
-        let largestFile = 0;
+        const response = await fetch(`${API_BASE_URL}/storage/overview`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
         
-        if (savedFiles) {
-          const files = JSON.parse(savedFiles);
-          fileCount = files.length;
-          
-          files.forEach(file => {
-            totalSize += file.size;
-            if (file.size > largestFile) {
-              largestFile = file.size;
-            }
-          });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
-        // Update storage overview
-        updateStorageOverview(totalSize, fileCount, largestFile);
+        const data = await response.json();
+        console.log('Storage overview API response:', data);
         
+        if (data.success) {
+          storageOverview = data.overview;
+          displayStorageOverview();
+          updateSidebarStorage();
+        } else {
+          throw new Error(data.error || 'Failed to load storage overview');
+        }
       } catch (error) {
-        console.error('Error loading storage data:', error);
-        updateStorageOverview(0, 0, 0);
+        console.error('Error loading storage overview:', error);
+        
+        // If API fails, try to calculate storage from files
+        await calculateStorageFromFiles(token);
+      } finally {
+        showLoading(false);
       }
     }
 
-    function updateStorageOverview(totalSize, fileCount, largestFile) {
-      const totalSizeGB = totalSize / (1024 * 1024 * 1024);
-      const maxStorageGB = 15;
-      const usagePercentage = (totalSizeGB / maxStorageGB) * 100;
+    async function calculateStorageFromFiles(token) {
+      console.log('Calculating storage from files...');
       
-      // Update total storage progress
+      try {
+        // Fetch user's files to calculate storage manually
+        const response = await fetch(`${API_BASE_URL}/files`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch files: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.files) {
+          // Calculate storage stats from files
+          const files = data.files;
+          const totalSize = files.reduce((sum, file) => sum + (file.size || 0), 0);
+          const fileCount = files.filter(file => !file.isFolder).length;
+          const folderCount = files.filter(file => file.isFolder).length;
+          
+          // Calculate file type breakdown
+          const fileTypeBreakdown = {};
+          files.forEach(file => {
+            if (!file.isFolder) {
+              fileTypeBreakdown[file.type] = (fileTypeBreakdown[file.type] || 0) + 1;
+            }
+          });
+          
+          // Create mock storage overview
+          storageOverview = {
+            total: {
+              used: totalSize,
+              total: 15 * 1024 * 1024 * 1024, // 15GB
+              files: fileCount,
+              folders: folderCount
+            },
+            byType: fileTypeBreakdown,
+            trends: {
+              monthlyGrowth: 5,
+              yearlyGrowth: 25,
+              largestFile: Math.max(...files.map(f => f.size || 0)),
+              averageFile: fileCount > 0 ? totalSize / fileCount : 0
+            }
+          };
+          
+          displayStorageOverview();
+          updateSidebarStorage();
+          
+          console.log('Calculated storage from files:', storageOverview);
+        } else {
+          throw new Error('No files data available');
+        }
+      } catch (error) {
+        console.error('Error calculating storage from files:', error);
+        showError('Failed to load storage data. Please try refreshing the page.');
+        
+        // Show empty state with debug info
+        showDebugInfo('Storage calculation failed: ' + error.message);
+      }
+    }
+
+    async function loadStoragePlans(token) {
+      console.log('Loading storage plans from API...');
+      
+      try {
+        const response = await fetch(`${API_BASE_URL}/storage/plans`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch storage plans: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          storagePlans = data.plans;
+          displayStoragePlans();
+        } else {
+          throw new Error(data.error || 'Failed to load storage plans');
+        }
+      } catch (error) {
+        console.error('Error loading storage plans:', error);
+        // Use default plans if API fails
+        storagePlans = getDefaultPlans();
+        displayStoragePlans();
+      }
+    }
+
+    function getDefaultPlans() {
+      return [
+        {
+          id: 'free',
+          name: 'Free',
+          storage: 15 * 1024 * 1024 * 1024,
+          price: 0,
+          features: [
+            'Basic file storage',
+            'File sharing',
+            '30-day trash recovery',
+            'Standard security',
+            'Basic support'
+          ],
+          current: true
+        },
+        {
+          id: 'pro',
+          name: 'Pro',
+          storage: 100 * 1024 * 1024 * 1024,
+          price: 2.99,
+          features: [
+            'Everything in Free',
+            '100 GB storage',
+            'Advanced security',
+            'Priority support',
+            '1-year trash recovery',
+            'No ads'
+          ],
+          recommended: true
+        },
+        {
+          id: 'business',
+          name: 'Business',
+          storage: 1024 * 1024 * 1024 * 1024,
+          price: 9.99,
+          features: [
+            'Everything in Pro',
+            '1 TB storage',
+            'Team collaboration',
+            'Advanced analytics',
+            '24/7 premium support',
+            'Custom branding'
+          ]
+        }
+      ];
+    }
+
+    function displayStorageOverview() {
+      const overviewContainer = document.getElementById('storage-overview');
+      
+      if (!storageOverview || !overviewContainer) {
+        showError('No storage data available');
+        return;
+      }
+
+      console.log('Displaying storage overview:', storageOverview);
+
+      // Update total storage
       const totalProgress = document.getElementById('total-progress');
       const usedStorage = document.getElementById('used-storage');
       const totalStorage = document.getElementById('total-storage');
+      const fileCount = document.getElementById('file-count');
+      const folderCount = document.getElementById('folder-count');
+      const totalItems = document.getElementById('total-items');
+      const usagePercentage = document.getElementById('usage-percentage');
       
-      if (totalProgress) totalProgress.style.width = `${usagePercentage}%`;
-      if (usedStorage) usedStorage.textContent = `${totalSizeGB.toFixed(2)} GB`;
-      if (totalStorage) totalStorage.textContent = `${maxStorageGB} GB`;
+      const usedStorageGB = storageOverview.total.used / (1024 * 1024 * 1024);
+      const totalStorageGB = storageOverview.total.total / (1024 * 1024 * 1024);
+      const usagePercent = Math.min((usedStorageGB / totalStorageGB) * 100, 100);
+      const totalItemsCount = (storageOverview.total.files || 0) + (storageOverview.total.folders || 0);
       
-      // Update file counts
-      const fileCountElement = document.getElementById('file-count');
-      const folderCountElement = document.getElementById('folder-count');
-      const largestFileElement = document.getElementById('largest-file');
-      const averageFileElement = document.getElementById('average-file');
+      if (totalProgress) totalProgress.style.width = `${usagePercent}%`;
+      if (usedStorage) usedStorage.textContent = `${usedStorageGB.toFixed(2)} GB`;
+      if (totalStorage) totalStorage.textContent = `${totalStorageGB} GB`;
+      if (fileCount) fileCount.textContent = storageOverview.total.files || 0;
+      if (folderCount) folderCount.textContent = storageOverview.total.folders || 0;
+      if (totalItems) totalItems.textContent = totalItemsCount;
+      if (usagePercentage) usagePercentage.textContent = `${usagePercent.toFixed(1)}%`;
+
+      // Update file type breakdown
+      displayFileTypeBreakdown();
+
+      // Update trends
+      const monthlyGrowth = document.getElementById('monthly-growth');
+      const yearlyGrowth = document.getElementById('yearly-growth');
+      const largestFile = document.getElementById('largest-file');
+      const averageFile = document.getElementById('average-file');
       
-      if (fileCountElement) fileCountElement.textContent = fileCount;
-      if (folderCountElement) folderCountElement.textContent = Math.floor(fileCount / 5); // Demo folder count
-      if (largestFileElement) largestFileElement.textContent = formatFileSize(largestFile);
-      if (averageFileElement && fileCount > 0) {
-        const averageSize = totalSize / fileCount;
-        averageFileElement.textContent = formatFileSize(averageSize);
+      if (monthlyGrowth) monthlyGrowth.textContent = `${storageOverview.trends?.monthlyGrowth || 0}%`;
+      if (yearlyGrowth) yearlyGrowth.textContent = `${storageOverview.trends?.yearlyGrowth || 0}%`;
+      if (largestFile) largestFile.textContent = formatFileSize(storageOverview.trends?.largestFile || 0);
+      if (averageFile) averageFile.textContent = formatFileSize(storageOverview.trends?.averageFile || 0);
+
+      overviewContainer.style.display = 'grid';
+      hideError();
+      
+      // Show debug info in development
+      showDebugInfo(`Storage calculated: ${usedStorageGB.toFixed(2)}GB used of ${totalStorageGB}GB total`);
+    }
+
+    function displayFileTypeBreakdown() {
+      const breakdownContainer = document.getElementById('file-type-breakdown');
+      
+      if (!breakdownContainer || !storageOverview.byType) {
+        breakdownContainer.innerHTML = '<div style="color: #ccc; text-align: center;">No file type data available</div>';
+        return;
+      }
+
+      breakdownContainer.innerHTML = '';
+
+      // Get file type breakdown data
+      const fileTypes = storageOverview.byType;
+      const totalSize = storageOverview.total.used;
+      
+      // Calculate actual sizes for each file type (simplified)
+      const totalFiles = Object.values(fileTypes).reduce((sum, val) => sum + val, 0);
+      
+      if (totalFiles === 0) {
+        breakdownContainer.innerHTML = '<div style="color: #ccc; text-align: center;">No files found</div>';
+        return;
+      }
+
+      // Create items for each file type
+      Object.entries(fileTypes).forEach(([type, count]) => {
+        if (count > 0) {
+          // Estimate size based on average file size
+          const averageFileSize = totalSize / totalFiles;
+          const typeSize = count * averageFileSize;
+          
+          const typeItem = document.createElement('div');
+          typeItem.className = 'file-type-item';
+          
+          typeItem.innerHTML = `
+            <div class="file-type-name">
+              <div class="file-type-icon">
+                <span class="material-icons">${getFileTypeIcon(type)}</span>
+              </div>
+              ${type.charAt(0).toUpperCase() + type.slice(1)} (${count})
+            </div>
+            <div class="file-type-size">${formatFileSize(typeSize)}</div>
+          `;
+          
+          breakdownContainer.appendChild(typeItem);
+        }
+      });
+    }
+
+    function getFileTypeIcon(fileType) {
+      const iconMap = {
+        'folder': 'folder',
+        'pdf': 'picture_as_pdf',
+        'image': 'image',
+        'video': 'movie',
+        'audio': 'audiotrack',
+        'document': 'description',
+        'spreadsheet': 'table_chart',
+        'presentation': 'slideshow',
+        'archive': 'folder_zip',
+        'text': 'article',
+        'code': 'code'
+      };
+      
+      return iconMap[fileType] || 'description';
+    }
+
+    function displayStoragePlans() {
+      const plansContainer = document.getElementById('plans-grid');
+      const storagePlansSection = document.getElementById('storage-plans');
+      const template = document.getElementById('plan-template');
+      
+      if (!plansContainer || !storagePlans || !template) {
+        return;
+      }
+
+      plansContainer.innerHTML = '';
+
+      storagePlans.forEach(plan => {
+        const clone = template.content.cloneNode(true);
+        const planCard = clone.querySelector('.plan-card');
+        const planName = clone.querySelector('.plan-name');
+        const planStorage = clone.querySelector('.plan-storage');
+        const planPrice = clone.querySelector('.plan-price');
+        const planFeatures = clone.querySelector('.plan-features');
+        const planButton = clone.querySelector('.plan-button');
+
+        // Set plan details
+        if (planName) planName.textContent = plan.name;
+        if (planStorage) planStorage.textContent = formatStorageSize(plan.storage);
+        if (planPrice) planPrice.textContent = plan.price === 0 ? 'Free' : `$${plan.price}/month`;
+        
+        // Set plan features
+        if (planFeatures) {
+          planFeatures.innerHTML = '';
+          plan.features.forEach(feature => {
+            const li = document.createElement('li');
+            li.innerHTML = `<span class="material-icons">check</span> ${feature}`;
+            planFeatures.appendChild(li);
+          });
+        }
+
+        // Set plan button
+        if (planButton) {
+          if (plan.current) {
+            planButton.textContent = 'Current Plan';
+            planButton.className = 'plan-button current';
+            planButton.disabled = true;
+          } else {
+            planButton.textContent = plan.recommended ? 'Upgrade Now' : 'Upgrade';
+            planButton.className = 'plan-button upgrade';
+            planButton.onclick = () => upgradePlan(plan.id);
+          }
+        }
+
+        // Add recommended badge
+        if (plan.recommended) {
+          planCard.classList.add('recommended');
+          const badge = document.createElement('div');
+          badge.className = 'recommended-badge';
+          badge.textContent = 'Most Popular';
+          planCard.appendChild(badge);
+        }
+
+        plansContainer.appendChild(clone);
+      });
+
+      storagePlansSection.style.display = 'block';
+    }
+
+    function formatStorageSize(bytes) {
+      const gb = bytes / (1024 * 1024 * 1024);
+      const tb = bytes / (1024 * 1024 * 1024 * 1024);
+      
+      if (tb >= 1) {
+        return `${tb.toFixed(1)} TB`;
+      } else {
+        return `${gb} GB`;
       }
     }
 
     function formatFileSize(bytes) {
-      if (bytes === 0) return '0 Bytes';
+      if (!bytes || bytes === 0) return '0 Bytes';
       
       const k = 1024;
       const sizes = ['Bytes', 'KB', 'MB', 'GB'];
@@ -781,32 +1137,66 @@
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
-    function updateStorageUsage() {
-      const userData = localStorage.getItem('user');
-      if (!userData) return;
+    function updateSidebarStorage() {
+      if (!storageOverview) return;
       
-      const user = JSON.parse(userData);
-      const userFileKey = `icestore_files_${user.id}`;
-      const savedFiles = localStorage.getItem(userFileKey);
+      const usedStorageGB = storageOverview.total.used / (1024 * 1024 * 1024);
+      const totalStorageGB = storageOverview.total.total / (1024 * 1024 * 1024);
+      const usagePercentage = Math.min((usedStorageGB / totalStorageGB) * 100, 100);
       
-      if (savedFiles) {
-        const files = JSON.parse(savedFiles);
-        const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-        const totalSizeGB = totalSize / (1024 * 1024 * 1024);
-        const maxStorageGB = 15;
-        
-        const usagePercentage = Math.min((totalSizeGB / maxStorageGB) * 100, 100);
-        
-        const progressFill = document.getElementById('storage-progress');
-        const usageText = document.getElementById('storage-text');
-        
-        if (progressFill) {
-          progressFill.style.width = `${usagePercentage}%`;
-        }
-        
-        if (usageText) {
-          usageText.textContent = `${totalSizeGB.toFixed(2)} GB of ${maxStorageGB} GB used`;
-        }
+      const progressFill = document.getElementById('storage-progress');
+      const usageText = document.getElementById('storage-text');
+      
+      if (progressFill) {
+        progressFill.style.width = `${usagePercentage}%`;
+      }
+      
+      if (usageText) {
+        usageText.textContent = `${usedStorageGB.toFixed(2)} GB of ${totalStorageGB} GB used`;
+      }
+    }
+
+    function showPlans() {
+      const plansSection = document.getElementById('storage-plans');
+      if (plansSection) {
+        plansSection.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    function upgradePlan(planId) {
+      alert(`Upgrading to ${planId} plan...\n\nThis would integrate with your payment system in a real application.`);
+    }
+
+    function showLoading(show) {
+      const loadingSpinner = document.getElementById('loading-spinner');
+      const storageOverview = document.getElementById('storage-overview');
+      const storagePlans = document.getElementById('storage-plans');
+      
+      if (loadingSpinner) {
+        loadingSpinner.style.display = show ? 'flex' : 'none';
+      }
+    }
+
+    function showError(message) {
+      const errorElement = document.getElementById('error-message');
+      if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+      }
+    }
+
+    function hideError() {
+      const errorElement = document.getElementById('error-message');
+      if (errorElement) {
+        errorElement.style.display = 'none';
+      }
+    }
+
+    function showDebugInfo(message) {
+      const debugElement = document.getElementById('debug-info');
+      if (debugElement && window.location.hostname === 'localhost') {
+        debugElement.textContent = message;
+        debugElement.style.display = 'block';
       }
     }
 

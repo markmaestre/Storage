@@ -287,6 +287,15 @@
       margin-bottom: 8px;
     }
 
+    .permission-badge {
+      background: rgba(76, 238, 232, 0.3);
+      color: white;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.7em;
+      margin-left: 5px;
+    }
+
     .file-actions {
       display: flex;
       justify-content: center;
@@ -322,6 +331,25 @@
       padding: 2px 6px;
       border-radius: 4px;
       font-size: 0.7em;
+    }
+
+    /* Loading and Error States */
+    .loading {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 200px;
+      color: #ccc;
+    }
+
+    .error-message {
+      background: rgba(255, 71, 87, 0.2);
+      border: 1px solid rgba(255, 71, 87, 0.5);
+      color: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 40px;
+      text-align: center;
     }
 
     /* Empty State Styles */
@@ -448,11 +476,20 @@
       <p>Files that others have shared with you</p>
     </div>
     
+    <!-- Loading State -->
+    <div class="loading" id="loading-state">
+      <span class="material-icons" style="margin-right: 10px;">refresh</span>
+      Loading shared files...
+    </div>
+    
+    <!-- Error State -->
+    <div class="error-message" id="error-state" style="display: none;"></div>
+    
     <!-- File Container -->
     <div class="file-container" id="file-container"></div>
     
     <!-- Empty State -->
-    <div class="empty-state-content" id="empty-state">
+    <div class="empty-state-content" id="empty-state" style="display: none;">
       <span class="material-icons">group</span>
       <p>No Shared Files</p>
       <p>Files shared with you will appear here</p>
@@ -476,15 +513,15 @@
         <button class="file-action-btn" title="Download">
           <span class="material-icons">download</span>
         </button>
-        <button class="file-action-btn" title="Open">
-          <span class="material-icons">open_in_new</span>
+        <button class="file-action-btn" title="View Details">
+          <span class="material-icons">info</span>
         </button>
       </div>
     </div>
   </template>
 
   <script>
-    const API_BASE_URL = 'http://localhost:3000/api/auth';
+    const API_BASE_URL = 'http://localhost:3000/api';
     let sharedFiles = [];
 
     // Initialize shared page
@@ -503,13 +540,13 @@
       try {
         const user = JSON.parse(userData);
         updateUserDisplay(user);
-        await loadSharedFiles(user);
+        await loadSharedFiles();
         updateStorageUsage();
         
         console.log('Shared page initialized with', sharedFiles.length, 'files');
       } catch (error) {
         console.error('Error initializing shared page:', error);
-        window.location.href = 'login.html';
+        showError('Failed to initialize shared files page');
       }
     }
 
@@ -525,66 +562,51 @@
       if (userAvatarElement) userAvatarElement.textContent = (user.username || 'U').charAt(0).toUpperCase();
     }
 
-    async function loadSharedFiles(user) {
-      console.log('Loading shared files for user:', user.id);
+    async function loadSharedFiles() {
+      console.log('Loading shared files from backend...');
+      
+      const loadingState = document.getElementById('loading-state');
+      const errorState = document.getElementById('error-state');
+      const container = document.getElementById('file-container');
+      const emptyState = document.getElementById('empty-state');
+      
+      // Show loading state
+      if (loadingState) loadingState.style.display = 'flex';
+      if (errorState) errorState.style.display = 'none';
+      if (container) container.style.display = 'none';
+      if (emptyState) emptyState.style.display = 'none';
       
       try {
-        // Load from localStorage for demo purposes
-        const sharedFileKey = `icestore_shared_${user.id}`;
-        const savedSharedFiles = localStorage.getItem(sharedFileKey);
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/files/shared`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
         
-        if (savedSharedFiles) {
-          sharedFiles = JSON.parse(savedSharedFiles);
+        if (result.success) {
+          sharedFiles = result.files || [];
+          displaySharedFiles();
         } else {
-          // Generate demo shared files
-          sharedFiles = generateDemoSharedFiles(user);
-          localStorage.setItem(sharedFileKey, JSON.stringify(sharedFiles));
+          throw new Error(result.error || 'Failed to load shared files');
         }
         
-        displaySharedFiles();
       } catch (error) {
         console.error('Error loading shared files:', error);
+        showError('Failed to load shared files: ' + error.message);
         sharedFiles = [];
         displaySharedFiles();
+      } finally {
+        if (loadingState) loadingState.style.display = 'none';
       }
-    }
-
-    function generateDemoSharedFiles(user) {
-      const sharedUsers = ['Alice Johnson', 'Bob Smith', 'Carol Davis', 'David Wilson'];
-      const fileTypes = ['document', 'image', 'pdf', 'spreadsheet', 'presentation'];
-      
-      return [
-        {
-          id: 'shared_1',
-          name: 'Project Proposal.docx',
-          type: 'document',
-          size: 2548576,
-          sharedBy: sharedUsers[0],
-          sharedDate: new Date(Date.now() - 86400000).toISOString(),
-          sharedByEmail: 'alice@company.com',
-          canEdit: false
-        },
-        {
-          id: 'shared_2',
-          name: 'Team Photos.zip',
-          type: 'archive',
-          size: 15485760,
-          sharedBy: sharedUsers[1],
-          sharedDate: new Date(Date.now() - 172800000).toISOString(),
-          sharedByEmail: 'bob@company.com',
-          canEdit: true
-        },
-        {
-          id: 'shared_3',
-          name: 'Financial Report.pdf',
-          type: 'pdf',
-          size: 3548576,
-          sharedBy: sharedUsers[2],
-          sharedDate: new Date(Date.now() - 259200000).toISOString(),
-          sharedByEmail: 'carol@company.com',
-          canEdit: false
-        }
-      ];
     }
 
     function displaySharedFiles() {
@@ -619,25 +641,32 @@
         const size = clone.querySelector('.file-size');
         const date = clone.querySelector('.file-date');
         const downloadBtn = clone.querySelector('.file-action-btn:nth-child(1)');
-        const openBtn = clone.querySelector('.file-action-btn:nth-child(2)');
+        const infoBtn = clone.querySelector('.file-action-btn:nth-child(2)');
 
         // Set file icon based on type
         const iconName = getFileIcon(file.type);
         if (icon) icon.textContent = iconName;
         
         if (name) name.textContent = file.name;
-        if (sharedBy) sharedBy.textContent = `Shared by: ${file.sharedBy}`;
+        if (sharedBy) {
+          sharedBy.innerHTML = `Shared by: ${file.sharedBy}`;
+          if (file.permission) {
+            const permissionBadge = document.createElement('span');
+            permissionBadge.className = 'permission-badge';
+            permissionBadge.textContent = file.permission === 'edit' ? 'Can Edit' : 'View Only';
+            sharedBy.appendChild(permissionBadge);
+          }
+        }
         if (size) size.textContent = formatFileSize(file.size);
-        if (date) date.textContent = formatDate(file.sharedDate);
+        if (date) date.textContent = formatDate(file.sharedAt || file.uploadDate);
         
         if (fileItem) {
-          fileItem.setAttribute('data-index', index);
           fileItem.setAttribute('data-file-id', file.id);
           
-          // Add click event for opening file
+          // Add click event for opening file info
           fileItem.addEventListener('click', function(e) {
             if (!e.target.closest('.file-action-btn')) {
-              openSharedFile(this);
+              showFileInfo(file);
             }
           });
         }
@@ -646,14 +675,14 @@
         if (downloadBtn) {
           downloadBtn.addEventListener('click', function(e) {
             e.stopPropagation();
-            downloadSharedFile(this);
+            downloadSharedFile(file);
           });
         }
         
-        if (openBtn) {
-          openBtn.addEventListener('click', function(e) {
+        if (infoBtn) {
+          infoBtn.addEventListener('click', function(e) {
             e.stopPropagation();
-            openSharedFile(this);
+            showFileInfo(file);
           });
         }
 
@@ -680,7 +709,7 @@
     }
 
     function formatFileSize(bytes) {
-      if (bytes === 0) return '0 Bytes';
+      if (!bytes || bytes === 0) return '0 Bytes';
       
       const k = 1024;
       const sizes = ['Bytes', 'KB', 'MB', 'GB'];
@@ -690,6 +719,8 @@
     }
 
     function formatDate(dateString) {
+      if (!dateString) return 'Unknown date';
+      
       const date = new Date(dateString);
       const now = new Date();
       const diffTime = Math.abs(now - date);
@@ -704,49 +735,107 @@
       }
     }
 
-    function openSharedFile(element) {
-      const fileItem = element.closest('.file-item');
-      const index = fileItem.getAttribute('data-index');
-      const file = sharedFiles[index];
+    async function downloadSharedFile(file) {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/files/${file.id}/download`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`Download failed: ${response.status}`);
+        }
+
+        // Create blob from response and trigger download
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        alert(`Download started: ${file.name}`);
+        
+      } catch (error) {
+        console.error('Error downloading file:', error);
+        alert('Failed to download file: ' + error.message);
+      }
+    }
+
+    function showFileInfo(file) {
+      const message = `
+File Information:
+----------------
+Name: ${file.name}
+Type: ${file.type}
+Size: ${formatFileSize(file.size)}
+Shared by: ${file.sharedBy} (${file.sharedByEmail})
+Shared on: ${formatDate(file.sharedAt)}
+Permissions: ${file.permission === 'edit' ? 'Can Edit' : 'View Only'}
+${file.canEdit ? '\nYou have edit permissions for this file' : '\nYou can only view this file'}
+      `.trim();
       
-      const message = `Opening shared file: ${file.name}\n\nShared by: ${file.sharedBy}\nShared on: ${formatDate(file.sharedDate)}\nEdit permission: ${file.canEdit ? 'Yes' : 'No'}`;
       alert(message);
     }
 
-    function downloadSharedFile(element) {
-      const fileItem = element.closest('.file-item');
-      const index = fileItem.getAttribute('data-index');
-      const file = sharedFiles[index];
+    function showError(message) {
+      const errorState = document.getElementById('error-state');
+      const loadingState = document.getElementById('loading-state');
+      const container = document.getElementById('file-container');
+      const emptyState = document.getElementById('empty-state');
       
-      alert(`Downloading shared file: ${file.name}\n\nThis file was shared by ${file.sharedBy}`);
+      if (loadingState) loadingState.style.display = 'none';
+      if (container) container.style.display = 'none';
+      if (emptyState) emptyState.style.display = 'none';
+      
+      if (errorState) {
+        errorState.textContent = message;
+        errorState.style.display = 'block';
+      }
     }
 
-    function updateStorageUsage() {
-      const userData = localStorage.getItem('user');
-      if (!userData) return;
-      
-      const user = JSON.parse(userData);
-      const userFileKey = `icestore_files_${user.id}`;
-      const savedFiles = localStorage.getItem(userFileKey);
-      
-      if (savedFiles) {
-        const files = JSON.parse(savedFiles);
-        const totalSize = files.reduce((sum, file) => sum + file.size, 0);
-        const totalSizeGB = totalSize / (1024 * 1024 * 1024);
-        const maxStorageGB = 15;
-        
-        const usagePercentage = Math.min((totalSizeGB / maxStorageGB) * 100, 100);
-        
-        const progressFill = document.getElementById('storage-progress');
-        const usageText = document.getElementById('storage-text');
-        
-        if (progressFill) {
-          progressFill.style.width = `${usagePercentage}%`;
+    async function updateStorageUsage() {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/storage/overview`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          if (result.success) {
+            const overview = result.overview;
+            const usedStorage = overview.total.used;
+            const maxStorage = overview.total.total;
+            const usagePercentage = (usedStorage / maxStorage) * 100;
+            
+            const progressFill = document.getElementById('storage-progress');
+            const usageText = document.getElementById('storage-text');
+            
+            if (progressFill) {
+              progressFill.style.width = `${Math.min(usagePercentage, 100)}%`;
+            }
+            
+            if (usageText) {
+              const usedGB = (usedStorage / (1024 * 1024 * 1024)).toFixed(2);
+              const maxGB = (maxStorage / (1024 * 1024 * 1024)).toFixed(0);
+              usageText.textContent = `${usedGB} GB of ${maxGB} GB used`;
+            }
+          }
         }
-        
-        if (usageText) {
-          usageText.textContent = `${totalSizeGB.toFixed(2)} GB of ${maxStorageGB} GB used`;
-        }
+      } catch (error) {
+        console.error('Error updating storage usage:', error);
       }
     }
 

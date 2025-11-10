@@ -51,8 +51,11 @@ storageStatsSchema.statics.updateUserStats = async function(userId) {
   try {
     const File = mongoose.model('File');
     
+    // Convert userId to ObjectId properly
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+    
     const fileStats = await File.aggregate([
-      { $match: { userId: mongoose.Types.ObjectId(userId), inTrash: false } },
+      { $match: { userId: userObjectId, inTrash: false } },
       {
         $group: {
           _id: '$type',
@@ -63,12 +66,12 @@ storageStatsSchema.statics.updateUserStats = async function(userId) {
     ]);
 
     const folderStats = await File.aggregate([
-      { $match: { userId: mongoose.Types.ObjectId(userId), isFolder: true, inTrash: false } },
+      { $match: { userId: userObjectId, isFolder: true, inTrash: false } },
       { $count: 'count' }
     ]);
 
     const totalStats = await File.aggregate([
-      { $match: { userId: mongoose.Types.ObjectId(userId), inTrash: false } },
+      { $match: { userId: userObjectId, inTrash: false } },
       {
         $group: {
           _id: null,
@@ -90,8 +93,8 @@ storageStatsSchema.statics.updateUserStats = async function(userId) {
 
     const totalFolders = folderStats[0]?.count || 0;
 
-    await this.findOneAndUpdate(
-      { userId },
+    const result = await this.findOneAndUpdate(
+      { userId: userObjectId },
       {
         totalFiles,
         totalFolders,

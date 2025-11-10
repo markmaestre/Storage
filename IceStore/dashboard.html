@@ -409,6 +409,152 @@
       border: 1px solid rgba(33, 150, 243, 0.5);
     }
 
+    /* Loading spinner */
+    .loading-spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255, 255, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Share Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(5px);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: rgba(26, 26, 46, 0.95);
+      border-radius: 12px;
+      padding: 30px;
+      width: 90%;
+      max-width: 500px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      backdrop-filter: blur(10px);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .modal-title {
+      color: white;
+      font-size: 1.5em;
+      font-weight: 500;
+    }
+
+    .close-button {
+      background: none;
+      border: none;
+      color: #ccc;
+      cursor: pointer;
+      font-size: 1.5em;
+      padding: 5px;
+    }
+
+    .close-button:hover {
+      color: white;
+    }
+
+    .share-form {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .form-label {
+      color: #ccc;
+      font-size: 0.9em;
+    }
+
+    .form-input {
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      color: white;
+      font-size: 14px;
+    }
+
+    .form-input::placeholder {
+      color: #888;
+    }
+
+    .permission-select {
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      color: white;
+      font-size: 14px;
+    }
+
+    .permission-select option {
+      background: #1a1a2e;
+      color: white;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+
+    .cancel-button {
+      padding: 10px 20px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .cancel-button:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .share-submit-button {
+      padding: 10px 20px;
+      background: rgba(0, 191, 255, 0.3);
+      border: 1px solid rgba(0, 191, 255, 0.5);
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .share-submit-button:hover {
+      background: rgba(0, 191, 255, 0.5);
+    }
+
     /* Responsive Design */
     @media (max-width: 768px) {
       .sidebar {
@@ -479,7 +625,7 @@
         <div class="sidebar-progress-fill" id="storage-progress"></div>
       </div>
       <p style="margin: 0; color: #ccc; font-size: 0.9em;" id="storage-text">0.00 GB of 15 GB used</p>
-      <button class="storage-btn">Get more storage</button>
+      <button class="storage-btn" onclick="window.location.href='storage.html'">Get more storage</button>
     </div>
   </div>
   
@@ -514,7 +660,7 @@
 
     <!-- Upload Button -->
     <div class="upload-button-container">
-      <button class="upload-button" onclick="uploadFile()">
+      <button class="upload-button" onclick="uploadFile()" id="upload-button">
         <span class="material-icons">add</span> 
         Upload a file
       </button>
@@ -522,6 +668,40 @@
 
     <!-- Hidden file input -->
     <input type="file" id="file-input" multiple>
+  </div>
+
+  <!-- Share Modal -->
+  <div class="modal-overlay" id="share-modal" style="display: none;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Share File</h3>
+        <button class="close-button" onclick="closeShareModal()">
+          <span class="material-icons">close</span>
+        </button>
+      </div>
+      <form class="share-form" id="share-form">
+        <input type="hidden" id="share-file-id">
+        <div class="form-group">
+          <label class="form-label">File Name</label>
+          <input type="text" id="share-file-name" class="form-input" readonly>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Share with (Email)</label>
+          <input type="email" id="share-user-email" class="form-input" placeholder="Enter user email" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Permission</label>
+          <select id="share-permission" class="permission-select">
+            <option value="view">View Only</option>
+            <option value="edit">Can Edit</option>
+          </select>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="cancel-button" onclick="closeShareModal()">Cancel</button>
+          <button type="submit" class="share-submit-button">Share File</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <!-- File Template -->
@@ -550,8 +730,9 @@
   </template>
 
   <script>
-    const API_BASE_URL = 'http://localhost:3000/api/auth';
+    const API_BASE_URL = 'http://localhost:3000/api';
     let userFiles = [];
+    let currentFileToShare = null;
 
     // Initialize dashboard
     async function initDashboard() {
@@ -569,15 +750,16 @@
       try {
         const user = JSON.parse(userData);
         updateUserDisplay(user);
-        await loadUserFiles(user);
+        await loadUserFiles();
         setupFileUpload();
         setupDragAndDrop();
-        updateStorageUsage();
+        setupShareModal();
+        await updateStorageUsage();
         
         console.log('Dashboard initialized with', userFiles.length, 'files');
       } catch (error) {
         console.error('Error initializing dashboard:', error);
-        window.location.href = 'login.html';
+        showNotification('Error loading dashboard data', 'error');
       }
     }
 
@@ -595,45 +777,32 @@
       if (userAvatarElement) userAvatarElement.textContent = (user.username || 'U').charAt(0).toUpperCase();
     }
 
-    async function loadUserFiles(user) {
-      console.log('Loading files for user:', user.id);
-      
+    async function loadUserFiles() {
       try {
-        // Load from localStorage for demo purposes
-        const userFileKey = `icestore_files_${user.id}`;
-        const savedFiles = localStorage.getItem(userFileKey);
-        
-        if (savedFiles) {
-          userFiles = JSON.parse(savedFiles);
-          console.log('Loaded files from localStorage:', userFiles);
-        } else {
-          // Add some demo files for first-time users
-          userFiles = [
-            {
-              id: 'file_1',
-              name: 'Welcome to IceStore.pdf',
-              type: 'pdf',
-              size: 2048576,
-              uploadDate: new Date().toISOString(),
-              uploader: user.username,
-              uploaderEmail: user.email
-            },
-            {
-              id: 'file_2',
-              name: 'Sample Image.jpg',
-              type: 'image',
-              size: 1048576,
-              uploadDate: new Date(Date.now() - 86400000).toISOString(),
-              uploader: user.username,
-              uploaderEmail: user.email
-            }
-          ];
-          localStorage.setItem(userFileKey, JSON.stringify(userFiles));
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/files`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
         }
+
+        const data = await response.json();
         
-        displayFiles();
+        if (data.success) {
+          userFiles = data.files || [];
+          console.log('Loaded files from backend:', userFiles);
+          displayFiles();
+        } else {
+          throw new Error(data.error || 'Failed to load files');
+        }
       } catch (error) {
         console.error('Error loading files:', error);
+        showNotification('Error loading files from server', 'error');
         userFiles = [];
         displayFiles();
       }
@@ -679,7 +848,7 @@
         
         if (name) name.textContent = file.name;
         if (size) size.textContent = formatFileSize(file.size);
-        if (date) date.textContent = formatDate(file.uploadDate);
+        if (date) date.textContent = formatDate(file.updatedAt || file.createdAt);
         
         if (fileItem) {
           fileItem.setAttribute('data-index', index);
@@ -704,7 +873,7 @@
         if (shareBtn) {
           shareBtn.addEventListener('click', function(e) {
             e.stopPropagation();
-            shareFile(this);
+            openShareModal(this);
           });
         }
         
@@ -748,75 +917,67 @@
       fileInput.addEventListener('change', handleFileSelection);
     }
 
-    function handleFileSelection(event) {
+    async function handleFileSelection(event) {
       const files = event.target.files;
       if (files.length === 0) return;
       
-      processFiles(files);
+      await processFiles(files);
     }
 
-    function processFiles(files) {
-      const userData = localStorage.getItem('user');
-      if (!userData) return;
-      
-      const user = JSON.parse(userData);
+    async function processFiles(files) {
+      const token = localStorage.getItem('token');
       let uploadedCount = 0;
+      const uploadButton = document.getElementById('upload-button');
+
+      // Show loading state
+      if (uploadButton) {
+        uploadButton.innerHTML = '<div class="loading-spinner"></div>Uploading...';
+        uploadButton.disabled = true;
+      }
 
       for (let file of files) {
-        // Check if file with same name already exists
-        const existingFileIndex = userFiles.findIndex(f => f.name === file.name);
-        
-        if (existingFileIndex !== -1) {
-          if (!confirm(`File "${file.name}" already exists. Do you want to replace it?`)) {
-            continue;
-          }
-          userFiles.splice(existingFileIndex, 1);
-        }
+        const formData = new FormData();
+        formData.append('file', file);
 
-        const newFile = {
-          id: 'file_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-          name: file.name,
-          type: getFileType(file.type),
-          size: file.size,
-          uploadDate: new Date().toISOString(),
-          uploader: user.username,
-          uploaderEmail: user.email,
-          lastModified: file.lastModified
-        };
-        
-        userFiles.unshift(newFile);
-        uploadedCount++;
+        try {
+          const response = await fetch(`${API_BASE_URL}/files/upload`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            },
+            body: formData
+          });
+
+          const data = await response.json();
+          
+          if (data.success) {
+            uploadedCount++;
+            console.log('File uploaded successfully:', data.file);
+          } else {
+            showNotification(`Error uploading ${file.name}: ${data.error}`, 'error');
+          }
+        } catch (error) {
+          console.error('Upload error:', error);
+          showNotification(`Error uploading ${file.name}`, 'error');
+        }
+      }
+      
+      // Reset upload button
+      if (uploadButton) {
+        uploadButton.innerHTML = '<span class="material-icons">add</span> Upload a file';
+        uploadButton.disabled = false;
       }
       
       if (uploadedCount > 0) {
-        // Save to localStorage
-        const userFileKey = `icestore_files_${user.id}`;
-        localStorage.setItem(userFileKey, JSON.stringify(userFiles));
-        
-        displayFiles();
-        updateStorageUsage();
-        
         showNotification(`Successfully uploaded ${uploadedCount} file(s)!`, 'success');
+        // Reload files to get updated list from backend
+        await loadUserFiles();
+        await updateStorageUsage();
       }
       
       // Reset file input
       const fileInput = document.getElementById('file-input');
       if (fileInput) fileInput.value = '';
-    }
-
-    function getFileType(mimeType) {
-      if (mimeType.startsWith('image/')) return 'image';
-      if (mimeType.startsWith('video/')) return 'video';
-      if (mimeType.startsWith('audio/')) return 'audio';
-      if (mimeType.includes('pdf')) return 'pdf';
-      if (mimeType.includes('word') || mimeType.includes('document')) return 'document';
-      if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return 'spreadsheet';
-      if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) return 'presentation';
-      if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('tar') || mimeType.includes('7z')) return 'archive';
-      if (mimeType.includes('text') || mimeType.includes('plain')) return 'text';
-      if (mimeType.includes('javascript') || mimeType.includes('python') || mimeType.includes('java') || 
-          mimeType.includes('cpp') || mimeType.includes('html') || mimeType.includes('css')) return 'code';
-      return 'document';
     }
 
     function uploadFile() {
@@ -858,13 +1019,83 @@
         mainContent.classList.remove('drag-over');
       }
 
-      function handleDrop(e) {
+      async function handleDrop(e) {
         const dt = e.dataTransfer;
         const files = dt.files;
         
         if (files.length > 0) {
-          processFiles(files);
+          await processFiles(files);
         }
+      }
+    }
+
+    function setupShareModal() {
+      const shareForm = document.getElementById('share-form');
+      if (shareForm) {
+        shareForm.addEventListener('submit', handleShareSubmit);
+      }
+    }
+
+    function openShareModal(element) {
+      const fileItem = element.closest('.file-item');
+      const fileId = fileItem.getAttribute('data-file-id');
+      const index = fileItem.getAttribute('data-index');
+      const file = userFiles[index];
+      
+      currentFileToShare = file;
+      
+      // Populate modal fields
+      document.getElementById('share-file-id').value = fileId;
+      document.getElementById('share-file-name').value = file.name;
+      document.getElementById('share-user-email').value = '';
+      document.getElementById('share-permission').value = 'view';
+      
+      // Show modal
+      document.getElementById('share-modal').style.display = 'flex';
+    }
+
+    function closeShareModal() {
+      document.getElementById('share-modal').style.display = 'none';
+      currentFileToShare = null;
+    }
+
+    async function handleShareSubmit(event) {
+      event.preventDefault();
+      
+      const fileId = document.getElementById('share-file-id').value;
+      const targetUserEmail = document.getElementById('share-user-email').value;
+      const permission = document.getElementById('share-permission').value;
+      
+      if (!targetUserEmail) {
+        showNotification('Please enter an email address', 'error');
+        return;
+      }
+
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/files/${fileId}/share`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            targetUserEmail: targetUserEmail,
+            permission: permission
+          })
+        });
+
+        const data = await response.json();
+        
+        if (data.success) {
+          showNotification(`File shared successfully with ${targetUserEmail}`, 'success');
+          closeShareModal();
+        } else {
+          showNotification(`Error sharing file: ${data.error}`, 'error');
+        }
+      } catch (error) {
+        console.error('Share error:', error);
+        showNotification('Error sharing file', 'error');
       }
     }
 
@@ -872,71 +1103,125 @@
       const index = element.getAttribute('data-index');
       const file = userFiles[index];
       
-      const message = `Opening: ${file.name}\n\nType: ${file.type}\nSize: ${formatFileSize(file.size)}\nUploaded by: ${file.uploader}\nUpload date: ${formatDate(file.uploadDate)}`;
+      const message = `Opening: ${file.name}\n\nType: ${file.type}\nSize: ${formatFileSize(file.size)}\nUpload date: ${formatDate(file.updatedAt || file.createdAt)}`;
       alert(message);
     }
 
-    function shareFile(element) {
+    async function downloadFile(element) {
       const fileItem = element.closest('.file-item');
-      const index = fileItem.getAttribute('data-index');
-      const file = userFiles[index];
+      const fileId = fileItem.getAttribute('data-file-id');
       
-      const shareUrl = `${window.location.origin}/share/${file.id}`;
-      alert(`Share: ${file.name}\n\nShare URL: ${shareUrl}\n\nThis will allow you to share this file with other users.`);
-    }
-
-    function downloadFile(element) {
-      const fileItem = element.closest('.file-item');
-      const index = fileItem.getAttribute('data-index');
-      const file = userFiles[index];
-      
-      showNotification(`Downloading "${file.name}"...`, 'info');
-      
-      setTimeout(() => {
-        showNotification(`"${file.name}" downloaded successfully!`, 'success');
-      }, 1000);
-    }
-
-    function deleteFile(element) {
-      const fileItem = element.closest('.file-item');
-      const index = fileItem.getAttribute('data-index');
-      const file = userFiles[index];
-      
-      if (confirm(`Are you sure you want to delete "${file.name}"?`)) {
-        const userData = localStorage.getItem('user');
-        if (!userData) return;
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/files/${fileId}/download`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
         
-        const user = JSON.parse(userData);
+        if (!response.ok) {
+          throw new Error(`Failed to download file: ${response.status}`);
+        }
         
-        userFiles.splice(index, 1);
+        // Get filename from Content-Disposition header or use file name
+        const contentDisposition = response.headers.get('Content-Disposition');
+        let filename = 'download';
         
-        // Update localStorage
-        const userFileKey = `icestore_files_${user.id}`;
-        localStorage.setItem(userFileKey, JSON.stringify(userFiles));
+        if (contentDisposition) {
+          const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+          if (filenameMatch) {
+            filename = filenameMatch[1];
+          }
+        }
         
-        displayFiles();
-        updateStorageUsage();
+        // Create blob and download
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
         
-        showNotification(`"${file.name}" has been deleted.`, 'info');
+        showNotification(`"${filename}" downloaded successfully!`, 'success');
+      } catch (error) {
+        console.error('Download error:', error);
+        showNotification('Error downloading file', 'error');
       }
     }
 
-    function updateStorageUsage() {
-      const totalSize = userFiles.reduce((sum, file) => sum + file.size, 0);
-      const totalSizeGB = totalSize / (1024 * 1024 * 1024);
-      const maxStorageGB = 15;
+    async function deleteFile(element) {
+      const fileItem = element.closest('.file-item');
+      const fileId = fileItem.getAttribute('data-file-id');
+      const index = fileItem.getAttribute('data-index');
+      const file = userFiles[index];
       
-      const usagePercentage = Math.min((totalSizeGB / maxStorageGB) * 100, 100);
-      
-      const progressFill = document.getElementById('storage-progress');
-      const usageText = document.getElementById('storage-text');
-      
-      if (progressFill) {
-        progressFill.style.width = `${usagePercentage}%`;
+      if (confirm(`Are you sure you want to move "${file.name}" to trash?`)) {
+        try {
+          const token = localStorage.getItem('token');
+          const response = await fetch(`${API_BASE_URL}/files/${fileId}/trash`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          const data = await response.json();
+          
+          if (data.success) {
+            showNotification(`"${file.name}" has been moved to trash.`, 'info');
+            // Reload files to get updated list
+            await loadUserFiles();
+            await updateStorageUsage();
+          } else {
+            showNotification(`Error deleting file: ${data.error}`, 'error');
+          }
+        } catch (error) {
+          console.error('Delete error:', error);
+          showNotification('Error deleting file', 'error');
+        }
       }
-      
-      if (usageText) {
-        usageText.textContent = `${totalSizeGB.toFixed(2)} GB of ${maxStorageGB} GB used`;
+    }
+
+    async function updateStorageUsage() {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/storage/overview`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        
+        if (data.success) {
+          const overview = data.overview;
+          const totalSizeGB = overview.total.used / (1024 * 1024 * 1024);
+          const maxStorageGB = 15;
+          const usagePercentage = Math.min((totalSizeGB / maxStorageGB) * 100, 100);
+          
+          const progressFill = document.getElementById('storage-progress');
+          const usageText = document.getElementById('storage-text');
+          
+          if (progressFill) {
+            progressFill.style.width = `${usagePercentage}%`;
+          }
+          
+          if (usageText) {
+            usageText.textContent = `${totalSizeGB.toFixed(2)} GB of ${maxStorageGB} GB used`;
+          }
+        }
+      } catch (error) {
+        console.error('Error updating storage usage:', error);
       }
     }
 
@@ -1000,6 +1285,7 @@
     // Make functions available globally
     window.uploadFile = uploadFile;
     window.logout = logout;
+    window.closeShareModal = closeShareModal;
 
     // Initialize when page loads
     document.addEventListener('DOMContentLoaded', initDashboard);
