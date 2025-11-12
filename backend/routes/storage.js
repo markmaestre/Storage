@@ -47,7 +47,7 @@ router.get('/overview', authMiddleware, async (req, res) => {
 });
 
 // Get storage plans
-router.get('/plans', authMiddleware, async (req, res) => {
+router.get('/plans', authMiddleware, async (req, res) => {  
   try {
     const plans = [
       {

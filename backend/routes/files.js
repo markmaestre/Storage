@@ -14,14 +14,12 @@ const router = express.Router();
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const userUploadDir = path.join(__dirname, '../uploads', req.user._id.toString());
-    // Create user-specific upload directory if it doesn't exist
     if (!fs.existsSync(userUploadDir)) {
       fs.mkdirSync(userUploadDir, { recursive: true });
     }
     cb(null, userUploadDir);
   },
   filename: function (req, file, cb) {
-    // Generate unique filename while preserving extension
     const fileExt = path.extname(file.originalname);
     const fileName = path.basename(file.originalname, fileExt);
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -35,7 +33,6 @@ const upload = multer({
     fileSize: 100 * 1024 * 1024 // 100MB limit
   },
   fileFilter: function (req, file, cb) {
-    // Accept all file types
     cb(null, true);
   }
 });
@@ -50,8 +47,10 @@ router.get('/', authMiddleware, async (req, res) => {
       inTrash: false 
     };
 
-    if (folder) {
-      query.parentFolder = folder === 'root' ? null : folder;
+    if (folder && folder !== 'root') {
+      query.parentFolder = folder;
+    } else if (folder === 'root') {
+      query.parentFolder = null;
     }
 
     if (type && type !== 'all') {
@@ -68,13 +67,52 @@ router.get('/', authMiddleware, async (req, res) => {
       .populate('sharedWith.user', 'username email')
       .lean();
 
-    // Log view activity
-    await Activity.logActivity({
-      type: 'view',
-      userId: req.user._id,
-      fileName: 'Multiple Files',
-      details: new Map([['action', 'list_files'], ['folder', folder || 'root']])
+    res.json({
+      success: true,
+      files: files.map(file => ({
+        id: file._id,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        uploadDate: file.createdAt,
+        updatedAt: file.updatedAt,
+        uploader: req.user.username,
+        uploaderEmail: req.user.email,
+        url: `/api/files/${file._id}/download`,
+        sharedWith: file.sharedWith,
+        isFolder: file.isFolder,
+        parentFolder: file.parentFolder
+      }))
     });
+  } catch (error) {
+    console.error('Get files error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server error while fetching files'
+    });
+  }
+});
+
+// Get folder contents
+router.get('/folders/:folderId', authMiddleware, async (req, res) => {
+  try {
+    const { folderId } = req.params;
+    
+    let query = { 
+      userId: req.user._id, 
+      inTrash: false 
+    };
+
+    if (folderId === 'root') {
+      query.parentFolder = null;
+    } else {
+      query.parentFolder = folderId;
+    }
+
+    const files = await File.find(query)
+      .sort({ isFolder: -1, name: 1 })
+      .populate('sharedWith.user', 'username email')
+      .lean();
 
     res.json({
       success: true,
@@ -89,14 +127,326 @@ router.get('/', authMiddleware, async (req, res) => {
         uploaderEmail: req.user.email,
         url: `/api/files/${file._id}/download`,
         sharedWith: file.sharedWith,
-        isFolder: file.isFolder
+        isFolder: file.isFolder,
+        parentFolder: file.parentFolder
       }))
     });
   } catch (error) {
-    console.error('Get files error:', error);
+    console.error('Get folder contents error:', error);
     res.status(500).json({
       success: false,
-      error: 'Server error while fetching files'
+      error: 'Server error while fetching folder contents'
+    });
+  }
+});
+
+// Create new folder
+router.post('/folders', authMiddleware, async (req, res) => {
+  try {
+    const { name, parentFolder = null } = req.body;
+
+    if (!name || name.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'Folder name is required'
+      });
+    }
+
+    const existingFolder = await File.findOne({
+      userId: req.user._id,
+      name: name.trim(),
+      isFolder: true,
+      parentFolder: parentFolder,
+      inTrash: false
+    });
+
+    if (existingFolder) {
+      return res.status(400).json({
+        success: false,
+        error: 'A folder with this name already exists in this location'
+      });
+    }
+
+    const newFolder = new File({
+      name: name.trim(),
+      type: 'folder',
+      size: 0,
+      path: null,
+      userId: req.user._id,
+      parentFolder: parentFolder,
+      isFolder: true,
+      metadata: new Map([['folderType', 'user_created']])
+    });
+
+    await newFolder.save();
+
+    await Activity.logActivity({
+      type: 'create_folder',
+      fileId: newFolder._id,
+      fileName: name.trim(),
+      userId: req.user._id,
+      details: new Map([['folderId', newFolder._id.toString()], ['parentFolder', parentFolder || 'root']])
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Folder created successfully',
+      folder: {
+        id: newFolder._id,
+        name: newFolder.name,
+        type: 'folder',
+        size: 0,
+        uploadDate: newFolder.createdAt,
+        updatedAt: newFolder.updatedAt,
+        isFolder: true,
+        parentFolder: newFolder.parentFolder
+      }
+    });
+  } catch (error) {
+    console.error('Create folder error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server error while creating folder'
+    });
+  }
+});
+
+// Upload file - UPDATED: Respects parentFolder
+router.post('/upload', authMiddleware, upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No file uploaded'
+      });
+    }
+
+    const { originalname, mimetype, size, filename, path: filePath } = req.file;
+    let { parentFolder } = req.body;
+
+    // Convert empty or 'root' to null for root folder
+    if (parentFolder === '' || parentFolder === 'root') {
+      parentFolder = null;
+    }
+
+    // Check if parent folder exists and belongs to user
+    if (parentFolder) {
+      const parentFolderDoc = await File.findOne({
+        _id: parentFolder,
+        userId: req.user._id,
+        isFolder: true,
+        inTrash: false
+      });
+      
+      if (!parentFolderDoc) {
+        fs.unlinkSync(filePath);
+        return res.status(400).json({
+          success: false,
+          error: 'Parent folder not found or access denied'
+        });
+      }
+    }
+
+    const storageStats = await StorageStats.findOne({ userId: req.user._id });
+    if (storageStats && (storageStats.usedStorage + size) > 16106127360) {
+      fs.unlinkSync(filePath);
+      return res.status(400).json({
+        success: false,
+        error: 'Storage limit exceeded. Please upgrade your plan or free up space.'
+      });
+    }
+
+    const fileType = getFileTypeFromMime(mimetype);
+
+    const newFile = new File({
+      name: originalname,
+      originalName: originalname,
+      type: fileType,
+      size: size,
+      path: filePath,
+      userId: req.user._id,
+      parentFolder: parentFolder, // This will keep the file in the specified folder
+      isFolder: false,
+      metadata: new Map([['uploadMethod', 'multer'], ['mimetype', mimetype]])
+    });
+
+    await newFile.save();
+
+    await StorageStats.updateUserStats(req.user._id);
+
+    await Activity.logActivity({
+      type: 'upload',
+      fileId: newFile._id,
+      fileName: originalname,
+      userId: req.user._id,
+      details: new Map([
+        ['size', size.toString()], 
+        ['type', fileType], 
+        ['parentFolder', parentFolder || 'root']
+      ])
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'File uploaded successfully',
+      file: {
+        id: newFile._id,
+        name: newFile.name,
+        type: newFile.type,
+        size: newFile.size,
+        uploadDate: newFile.createdAt,
+        uploader: req.user.username,
+        uploaderEmail: req.user.email,
+        url: `/api/files/${newFile._id}/download`,
+        parentFolder: newFile.parentFolder
+      }
+    });
+  } catch (error) {
+    console.error('Upload file error:', error);
+    
+    if (req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (cleanupError) {
+        console.error('Error cleaning up file:', cleanupError);
+      }
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Server error while uploading file'
+    });
+  }
+});
+
+// Upload multiple files - UPDATED: Respects parentFolder
+router.post('/upload-multiple', authMiddleware, upload.array('files', 50), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'No files uploaded'
+      });
+    }
+
+    let { parentFolder } = req.body;
+    
+    if (parentFolder === '' || parentFolder === 'root') {
+      parentFolder = null;
+    }
+
+    // Check if parent folder exists and belongs to user
+    if (parentFolder) {
+      const parentFolderDoc = await File.findOne({
+        _id: parentFolder,
+        userId: req.user._id,
+        isFolder: true,
+        inTrash: false
+      });
+      
+      if (!parentFolderDoc) {
+        req.files.forEach(file => {
+          if (fs.existsSync(file.path)) {
+            fs.unlinkSync(file.path);
+          }
+        });
+        return res.status(400).json({
+          success: false,
+          error: 'Parent folder not found or access denied'
+        });
+      }
+    }
+
+    const uploadedFiles = [];
+    let totalSize = 0;
+
+    const storageStats = await StorageStats.findOne({ userId: req.user._id });
+    const currentUsed = storageStats ? storageStats.usedStorage : 0;
+    
+    const uploadSize = req.files.reduce((sum, file) => sum + file.size, 0);
+    if ((currentUsed + uploadSize) > 16106127360) {
+      req.files.forEach(file => {
+        if (fs.existsSync(file.path)) {
+          fs.unlinkSync(file.path);
+        }
+      });
+      
+      return res.status(400).json({
+        success: false,
+        error: 'Storage limit exceeded. Please upgrade your plan or free up space.'
+      });
+    }
+
+    for (const file of req.files) {
+      const { originalname, mimetype, size, filename, path: filePath } = file;
+      const fileType = getFileTypeFromMime(mimetype);
+
+      const newFile = new File({
+        name: originalname,
+        originalName: originalname,
+        type: fileType,
+        size: size,
+        path: filePath,
+        userId: req.user._id,
+        parentFolder: parentFolder, // All files go to the specified folder
+        isFolder: false,
+        metadata: new Map([['uploadMethod', 'multer'], ['mimetype', mimetype]])
+      });
+
+      await newFile.save();
+      totalSize += size;
+
+      uploadedFiles.push({
+        id: newFile._id,
+        name: newFile.name,
+        type: newFile.type,
+        size: newFile.size,
+        uploadDate: newFile.createdAt,
+        uploader: req.user.username,
+        uploaderEmail: req.user.email,
+        url: `/api/files/${newFile._id}/download`,
+        parentFolder: newFile.parentFolder
+      });
+
+      await Activity.logActivity({
+        type: 'upload',
+        fileId: newFile._id,
+        fileName: originalname,
+        userId: req.user._id,
+        details: new Map([
+          ['size', size.toString()], 
+          ['type', fileType], 
+          ['parentFolder', parentFolder || 'root']
+        ])
+      });
+    }
+
+    await StorageStats.updateUserStats(req.user._id);
+
+    res.status(201).json({
+      success: true,
+      message: `${uploadedFiles.length} files uploaded successfully`,
+      files: uploadedFiles,
+      totalSize: totalSize
+    });
+  } catch (error) {
+    console.error('Multiple upload error:', error);
+    
+    if (req.files) {
+      req.files.forEach(file => {
+        if (file && file.path) {
+          try {
+            fs.unlinkSync(file.path);
+          } catch (cleanupError) {
+            console.error('Error cleaning up file:', cleanupError);
+          }
+        }
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      error: 'Server error while uploading files'
     });
   }
 });
@@ -109,7 +459,7 @@ router.get('/recent', authMiddleware, async (req, res) => {
     const activities = await Activity.find({ userId: req.user._id })
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
-      .populate('fileId', 'name type')
+      .populate('fileId', 'name type parentFolder')
       .populate('targetUserId', 'username email')
       .lean();
 
@@ -164,7 +514,9 @@ router.get('/shared', authMiddleware, async (req, res) => {
         sharedAt: shareInfo.sharedAt,
         permission: shareInfo.permission,
         url: `/api/files/${file._id}/download`,
-        canEdit: shareInfo.permission === 'edit'
+        canEdit: shareInfo.permission === 'edit',
+        isFolder: file.isFolder,
+        parentFolder: file.parentFolder
       };
     });
 
@@ -200,7 +552,10 @@ router.get('/trash', authMiddleware, async (req, res) => {
         size: file.size,
         uploadDate: file.createdAt,
         deletedAt: file.deletedAt,
-        url: `/api/files/${file._id}/download`
+        permanentDeleteAt: file.permanentDeleteAt,
+        url: `/api/files/${file._id}/download`,
+        isFolder: file.isFolder,
+        parentFolder: file.parentFolder
       }))
     });
   } catch (error) {
@@ -212,88 +567,214 @@ router.get('/trash', authMiddleware, async (req, res) => {
   }
 });
 
-// Upload file
-router.post('/upload', authMiddleware, upload.single('file'), async (req, res) => {
+// Rename file or folder
+router.patch('/:fileId/rename', authMiddleware, async (req, res) => {
   try {
-    console.log('Upload request received:', req.file);
-    
-    if (!req.file) {
+    const { fileId } = req.params;
+    const { name } = req.body;
+
+    if (!name || name.trim() === '') {
       return res.status(400).json({
         success: false,
-        error: 'No file uploaded'
+        error: 'New name is required'
       });
     }
 
-    const { originalname, mimetype, size, filename, path: filePath } = req.file;
-
-    // Check storage limit (15GB = 16106127360 bytes)
-    const storageStats = await StorageStats.findOne({ userId: req.user._id });
-    if (storageStats && (storageStats.usedStorage + size) > 16106127360) {
-      // Delete the uploaded file
-      fs.unlinkSync(filePath);
-      return res.status(400).json({
-        success: false,
-        error: 'Storage limit exceeded. Please upgrade your plan or free up space.'
-      });
-    }
-
-    const fileType = getFileTypeFromMime(mimetype);
-
-    const newFile = new File({
-      name: originalname,
-      originalName: originalname,
-      type: fileType,
-      size: size,
-      path: filePath,
-      userId: req.user._id,
-      parentFolder: null, // root folder
-      isFolder: false,
-      metadata: new Map([['uploadMethod', 'multer'], ['mimetype', mimetype]])
+    const file = await File.findOne({ 
+      _id: fileId, 
+      userId: req.user._id 
     });
 
-    await newFile.save();
+    if (!file) {
+      return res.status(404).json({
+        success: false,
+        error: 'File not found'
+      });
+    }
 
-    // Update storage stats
-    await StorageStats.updateUserStats(req.user._id);
+    const oldName = file.name;
+    file.name = name.trim();
+    file.updatedAt = new Date();
 
-    // Log activity
+    await file.save();
+
     await Activity.logActivity({
-      type: 'upload',
-      fileId: newFile._id,
-      fileName: originalname,
+      type: 'rename',
+      fileId: file._id,
+      fileName: name.trim(),
       userId: req.user._id,
-      details: new Map([['size', size.toString()], ['type', fileType]])
+      details: new Map([['oldName', oldName], ['newName', name.trim()]])
     });
 
-    res.status(201).json({
+    res.json({
       success: true,
-      message: 'File uploaded successfully',
+      message: 'Renamed successfully',
       file: {
-        id: newFile._id,
-        name: newFile.name,
-        type: newFile.type,
-        size: newFile.size,
-        uploadDate: newFile.createdAt,
-        uploader: req.user.username,
-        uploaderEmail: req.user.email,
-        url: `/api/files/${newFile._id}/download`
+        id: file._id,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        updatedAt: file.updatedAt
       }
     });
   } catch (error) {
-    console.error('Upload file error:', error);
-    
-    // Clean up uploaded file if error occurred
-    if (req.file && req.file.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (cleanupError) {
-        console.error('Error cleaning up file:', cleanupError);
-      }
-    }
-    
+    console.error('Rename file error:', error);
     res.status(500).json({
       success: false,
-      error: 'Server error while uploading file'
+      error: 'Server error while renaming file'
+    });
+  }
+});
+
+// Move file/folder
+router.post('/:fileId/move', authMiddleware, async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    let { targetFolderId } = req.body;
+
+    const file = await File.findOne({ _id: fileId, userId: req.user._id });
+    if (!file) {
+      return res.status(404).json({
+        success: false,
+        error: 'File not found'
+      });
+    }
+
+    if (targetFolderId === '' || targetFolderId === 'root') {
+      targetFolderId = null;
+    }
+
+    if (targetFolderId) {
+      const targetFolder = await File.findOne({ 
+        _id: targetFolderId, 
+        userId: req.user._id, 
+        isFolder: true 
+      });
+      
+      if (!targetFolder) {
+        return res.status(404).json({
+          success: false,
+          error: 'Target folder not found'
+        });
+      }
+
+      if (file.isFolder && fileId === targetFolderId) {
+        return res.status(400).json({
+          success: false,
+          error: 'Cannot move folder into itself'
+        });
+      }
+
+      if (file.isFolder) {
+        const isSubfolder = await checkIfSubfolder(targetFolderId, fileId);
+        if (isSubfolder) {
+          return res.status(400).json({
+            success: false,
+            error: 'Cannot move folder into its own subfolder'
+          });
+        }
+      }
+    }
+
+    const oldParent = file.parentFolder;
+    file.parentFolder = targetFolderId;
+    file.updatedAt = new Date();
+
+    await file.save();
+
+    await Activity.logActivity({
+      type: 'move',
+      fileId: file._id,
+      fileName: file.name,
+      userId: req.user._id,
+      details: new Map([['oldLocation', oldParent || 'root'], ['newLocation', targetFolderId || 'root']])
+    });
+
+    res.json({
+      success: true,
+      message: 'Moved successfully'
+    });
+  } catch (error) {
+    console.error('Move file error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server error while moving file'
+    });
+  }
+});
+
+// Copy file/folder
+router.post('/:fileId/copy', authMiddleware, async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    let { targetFolderId } = req.body;
+
+    const originalFile = await File.findOne({ _id: fileId, userId: req.user._id });
+    if (!originalFile) {
+      return res.status(404).json({
+        success: false,
+        error: 'File not found'
+      });
+    }
+
+    if (targetFolderId === '' || targetFolderId === 'root') {
+      targetFolderId = null;
+    }
+
+    if (targetFolderId) {
+      const targetFolder = await File.findOne({ 
+        _id: targetFolderId, 
+        userId: req.user._id, 
+        isFolder: true 
+      });
+      
+      if (!targetFolder) {
+        return res.status(404).json({
+          success: false,
+          error: 'Target folder not found'
+        });
+      }
+    }
+
+    const fileCopy = new File({
+      name: originalFile.name + ' (Copy)',
+      originalName: originalFile.originalName,
+      type: originalFile.type,
+      size: originalFile.size,
+      path: originalFile.path,
+      userId: req.user._id,
+      parentFolder: targetFolderId,
+      isFolder: originalFile.isFolder,
+      metadata: originalFile.metadata
+    });
+
+    await fileCopy.save();
+
+    await Activity.logActivity({
+      type: 'copy',
+      fileId: fileCopy._id,
+      fileName: fileCopy.name,
+      userId: req.user._id,
+      details: new Map([['originalFile', originalFile.name], ['newLocation', targetFolderId || 'root']])
+    });
+
+    res.json({
+      success: true,
+      message: 'Copied successfully',
+      file: {
+        id: fileCopy._id,
+        name: fileCopy.name,
+        type: fileCopy.type,
+        size: fileCopy.size,
+        isFolder: fileCopy.isFolder,
+        parentFolder: fileCopy.parentFolder
+      }
+    });
+  } catch (error) {
+    console.error('Copy file error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server error while copying file'
     });
   }
 });
@@ -318,6 +799,13 @@ router.get('/:fileId/download', authMiddleware, async (req, res) => {
       });
     }
 
+    if (file.isFolder) {
+      return res.status(400).json({
+        success: false,
+        error: 'Cannot download folders'
+      });
+    }
+
     if (!fs.existsSync(file.path)) {
       return res.status(404).json({
         success: false,
@@ -325,7 +813,6 @@ router.get('/:fileId/download', authMiddleware, async (req, res) => {
       });
     }
 
-    // Log download activity
     await Activity.logActivity({
       type: 'download',
       fileId: file._id,
@@ -429,7 +916,7 @@ router.post('/:fileId/share', authMiddleware, async (req, res) => {
   }
 });
 
-// Move file to trash
+// Move to trash
 router.post('/:fileId/trash', authMiddleware, async (req, res) => {
   try {
     const { fileId } = req.params;
@@ -444,14 +931,12 @@ router.post('/:fileId/trash', authMiddleware, async (req, res) => {
 
     file.inTrash = true;
     file.deletedAt = new Date();
-    file.permanentDeleteAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    file.permanentDeleteAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
     await file.save();
 
-    // Update storage stats
     await StorageStats.updateUserStats(req.user._id);
 
-    // Log activity
     await Activity.logActivity({
       type: 'delete',
       fileId: file._id,
@@ -461,7 +946,7 @@ router.post('/:fileId/trash', authMiddleware, async (req, res) => {
 
     res.json({
       success: true,
-      message: 'File moved to trash'
+      message: 'Moved to trash'
     });
   } catch (error) {
     console.error('Move to trash error:', error);
@@ -491,10 +976,8 @@ router.post('/:fileId/restore', authMiddleware, async (req, res) => {
 
     await file.save();
 
-    // Update storage stats
     await StorageStats.updateUserStats(req.user._id);
 
-    // Log activity
     await Activity.logActivity({
       type: 'restore',
       fileId: file._id,
@@ -538,6 +1021,14 @@ router.delete('/:fileId', authMiddleware, async (req, res) => {
     // Update storage stats
     await StorageStats.updateUserStats(req.user._id);
 
+    // Log activity
+    await Activity.logActivity({
+      type: 'permanent_delete',
+      fileId: fileId,
+      fileName: file.name,
+      userId: req.user._id
+    });
+
     res.json({
       success: true,
       message: 'File permanently deleted'
@@ -574,6 +1065,14 @@ router.delete('/trash/empty', authMiddleware, async (req, res) => {
 
     // Update storage stats
     await StorageStats.updateUserStats(req.user._id);
+
+    // Log activity
+    await Activity.logActivity({
+      type: 'empty_trash',
+      userId: req.user._id,
+      fileName: 'Multiple Files',
+      details: new Map([['count', trashFiles.length.toString()]])
+    });
 
     res.json({
       success: true,
@@ -622,6 +1121,7 @@ router.get('/:fileId/info', authMiddleware, async (req, res) => {
         sharedWith: file.sharedWith,
         isFolder: file.isFolder,
         inTrash: file.inTrash,
+        parentFolder: file.parentFolder,
         url: `/api/files/${file._id}/download`
       }
     });
@@ -634,7 +1134,78 @@ router.get('/:fileId/info', authMiddleware, async (req, res) => {
   }
 });
 
+// Get storage overview
+router.get('/storage/overview', authMiddleware, async (req, res) => {
+  try {
+    const storageStats = await StorageStats.findOne({ userId: req.user._id });
+    
+    if (!storageStats) {
+      const newStats = await StorageStats.updateUserStats(req.user._id);
+      return res.json({
+        success: true,
+        overview: {
+          total: {
+            used: 0,
+            available: 16106127360,
+            fileCount: 0,
+            folderCount: 0
+          },
+          byType: {}
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      overview: {
+        total: {
+          used: storageStats.usedStorage,
+          available: 16106127360,
+          fileCount: storageStats.totalFiles,
+          folderCount: storageStats.totalFolders
+        },
+        byType: storageStats.fileTypeBreakdown
+      }
+    });
+  } catch (error) {
+    console.error('Get storage overview error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server error while fetching storage overview'
+    });
+  }
+});
+
 // Helper functions
+async function checkIfSubfolder(parentFolderId, potentialSubfolderId) {
+  let currentFolderId = parentFolderId;
+  
+  while (currentFolderId) {
+    const folder = await File.findById(currentFolderId);
+    if (!folder) break;
+    
+    if (folder._id.toString() === potentialSubfolderId.toString()) {
+      return true;
+    }
+    
+    currentFolderId = folder.parentFolder;
+  }
+  
+  return false;
+}
+
+function getFileTypeFromMime(mimeType) {
+  if (mimeType.startsWith('image/')) return 'image';
+  if (mimeType.startsWith('video/')) return 'video';
+  if (mimeType.startsWith('audio/')) return 'audio';
+  if (mimeType.includes('pdf')) return 'pdf';
+  if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('tar') || mimeType.includes('7z')) return 'archive';
+  if (mimeType.includes('text') || mimeType.includes('plain')) return 'text';
+  if (mimeType.includes('javascript') || mimeType.includes('python') || mimeType.includes('java') || 
+      mimeType.includes('cpp') || mimeType.includes('html') || mimeType.includes('css')) return 'code';
+  return 'document';
+}
+
 function getActivityDescription(activity) {
   const descriptions = {
     upload: `You uploaded ${activity.fileName}`,
@@ -645,7 +1216,10 @@ function getActivityDescription(activity) {
     move: `You moved ${activity.fileName}`,
     delete: `You deleted ${activity.fileName}`,
     restore: `You restored ${activity.fileName}`,
-    create_folder: `You created folder ${activity.fileName}`
+    create_folder: `You created folder ${activity.fileName}`,
+    copy: `You copied ${activity.fileName}`,
+    permanent_delete: `You permanently deleted ${activity.fileName}`,
+    empty_trash: `You emptied trash (${activity.details?.get('count') || 'multiple'} files)`
   };
   return descriptions[activity.type] || `You performed ${activity.type} on ${activity.fileName}`;
 }
@@ -660,24 +1234,12 @@ function getActivityIcon(type) {
     move: 'drive_file_move',
     delete: 'delete',
     restore: 'restore',
-    create_folder: 'create_new_folder'
+    create_folder: 'create_new_folder',
+    copy: 'content_copy',
+    permanent_delete: 'delete_forever',
+    empty_trash: 'delete_sweep'
   };
   return icons[type] || 'description';
-}
-
-function getFileTypeFromMime(mimeType) {
-  if (mimeType.startsWith('image/')) return 'image';
-  if (mimeType.startsWith('video/')) return 'video';
-  if (mimeType.startsWith('audio/')) return 'audio';
-  if (mimeType.includes('pdf')) return 'pdf';
-  if (mimeType.includes('word') || mimeType.includes('document')) return 'document';
-  if (mimeType.includes('spreadsheet') || mimeType.includes('excel')) return 'spreadsheet';
-  if (mimeType.includes('presentation') || mimeType.includes('powerpoint')) return 'presentation';
-  if (mimeType.includes('zip') || mimeType.includes('rar') || mimeType.includes('tar') || mimeType.includes('7z')) return 'archive';
-  if (mimeType.includes('text') || mimeType.includes('plain')) return 'text';
-  if (mimeType.includes('javascript') || mimeType.includes('python') || mimeType.includes('java') || 
-      mimeType.includes('cpp') || mimeType.includes('html') || mimeType.includes('css')) return 'code';
-  return 'document';
 }
 
 module.exports = router;

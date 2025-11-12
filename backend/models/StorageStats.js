@@ -33,7 +33,8 @@ const storageStatsSchema = new mongoose.Schema({
     presentation: { type: Number, default: 0 },
     archive: { type: Number, default: 0 },
     text: { type: Number, default: 0 },
-    code: { type: Number, default: 0 }
+    code: { type: Number, default: 0 },
+    folder: { type: Number, default: 0 }
   },
   lastCalculated: {
     type: Date,
@@ -54,8 +55,14 @@ storageStatsSchema.statics.updateUserStats = async function(userId) {
     // Convert userId to ObjectId properly
     const userObjectId = new mongoose.Types.ObjectId(userId);
     
+    // Get file type breakdown (including folders)
     const fileStats = await File.aggregate([
-      { $match: { userId: userObjectId, inTrash: false } },
+      { 
+        $match: { 
+          userId: userObjectId, 
+          inTrash: false 
+        } 
+      },
       {
         $group: {
           _id: '$type',
@@ -65,50 +72,115 @@ storageStatsSchema.statics.updateUserStats = async function(userId) {
       }
     ]);
 
-    const folderStats = await File.aggregate([
-      { $match: { userId: userObjectId, isFolder: true, inTrash: false } },
-      { $count: 'count' }
-    ]);
-
-    const totalStats = await File.aggregate([
-      { $match: { userId: userObjectId, inTrash: false } },
+    // Get separate counts for files and folders
+    const counts = await File.aggregate([
+      { 
+        $match: { 
+          userId: userObjectId, 
+          inTrash: false 
+        } 
+      },
       {
         $group: {
           _id: null,
-          totalFiles: { $sum: { $cond: [{ $eq: ['$isFolder', false] }, 1, 0] } },
+          totalFiles: { 
+            $sum: { 
+              $cond: [{ $eq: ['$isFolder', false] }, 1, 0] 
+            } 
+          },
+          totalFolders: { 
+            $sum: { 
+              $cond: [{ $eq: ['$isFolder', true] }, 1, 0] 
+            } 
+          },
           totalSize: { $sum: '$size' }
         }
       }
     ]);
 
-    const fileTypeBreakdown = {};
-    let totalSize = 0;
-    let totalFiles = 0;
+    // Initialize file type breakdown
+    const fileTypeBreakdown = {
+      document: 0,
+      image: 0,
+      video: 0,
+      audio: 0,
+      pdf: 0,
+      spreadsheet: 0,
+      presentation: 0,
+      archive: 0,
+      text: 0,
+      code: 0,
+      folder: 0
+    };
 
+    let totalSize = 0;
+
+    // Populate file type breakdown
     fileStats.forEach(stat => {
-      fileTypeBreakdown[stat._id] = stat.count;
+      if (fileTypeBreakdown.hasOwnProperty(stat._id)) {
+        fileTypeBreakdown[stat._id] = stat.count;
+      }
       totalSize += stat.totalSize;
-      totalFiles += stat.count;
     });
 
-    const totalFolders = folderStats[0]?.count || 0;
+    const totalFiles = counts[0]?.totalFiles || 0;
+    const totalFolders = counts[0]?.totalFolders || 0;
+    const calculatedTotalSize = counts[0]?.totalSize || 0;
 
+    // Update storage stats
     const result = await this.findOneAndUpdate(
       { userId: userObjectId },
       {
         totalFiles,
         totalFolders,
-        totalSize,
-        usedStorage: totalSize,
+        totalSize: calculatedTotalSize,
+        usedStorage: calculatedTotalSize,
         fileTypeBreakdown,
         lastCalculated: new Date()
       },
       { upsert: true, new: true }
     );
 
-    return { totalFiles, totalFolders, totalSize, fileTypeBreakdown };
+    console.log(`Updated stats for user ${userId}:`, {
+      totalFiles,
+      totalFolders,
+      totalSize: calculatedTotalSize,
+      fileTypeBreakdown
+    });
+
+    return { 
+      totalFiles, 
+      totalFolders, 
+      totalSize: calculatedTotalSize, 
+      fileTypeBreakdown 
+    };
   } catch (error) {
     console.error('Error updating storage stats:', error);
+    throw error;
+  }
+};
+
+// Method to get storage overview
+storageStatsSchema.statics.getStorageOverview = async function(userId) {
+  try {
+    const stats = await this.findOne({ userId });
+    
+    if (!stats) {
+      // If no stats exist, create them
+      return await this.updateUserStats(userId);
+    }
+
+    return {
+      total: {
+        used: stats.usedStorage,
+        available: 16106127360, // 15GB in bytes
+        fileCount: stats.totalFiles,
+        folderCount: stats.totalFolders
+      },
+      byType: stats.fileTypeBreakdown
+    };
+  } catch (error) {
+    console.error('Error getting storage overview:', error);
     throw error;
   }
 };
